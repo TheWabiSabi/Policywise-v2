@@ -1,0 +1,19 @@
+﻿Classification,Feature,One-liner Explanation
+Core Hospitalisation,In-Patient Hospitalisation,Covers medical expenses for hospitalisation exceeding 24 hours.
+Core Hospitalisation,Day Care Treatments,Covers listed procedures that do not require 24-hour hospitalisation.
+Core Hospitalisation,Pre & Post Hospitalisation,Covers medical expenses incurred before and after hospitalisation for a defined period.
+Core Hospitalisation,Room Rent,Covers hospital room charges up to the eligible category or limits.
+Core Hospitalisation,ICU Charges,Covers treatment expenses incurred in the Intensive Care Unit.
+Core Hospitalisation,Ambulance Cover,Covers emergency road ambulance transportation expenses.
+Core Hospitalisation,Domiciliary Treatment,Covers treatment taken at home when hospitalisation is medically not possible.
+Core Benefits,No Claim Bonus,Increases the sum insured for every claim-free policy year.
+Core Benefits,Restoration Benefit,Reinstates exhausted sum insured after it is used in a claim.
+Core Benefits,Donor Expenses,Covers hospitalisation expenses of the organ donor when the insured is the recipient.
+Alternative Treatment,AYUSH Treatment,"Covers treatment under Ayurveda, Yoga, Unani, Siddha, and Homeopathy systems."
+Waiting Periods,Initial Waiting Period,Coverage starts after the standard 30-day waiting period.
+Waiting Periods,Coverage of Pre-Existing Diseases,Covers pre-existing diseases after a specified waiting period.
+Waiting Periods,Specific Illness Waiting Period,Covers certain listed illnesses after a defined waiting period.
+Policyholder Rights,Free Look Period,Allows cancellation of policy within the free-look period after purchase.
+Policyholder Rights,Portability,Allows transfer of policy to another insurer with continuity benefits.
+Policyholder Rights,Migration,Allows switching to another plan within the same insurer.
+Policyholder Protection,Moratorium Period,Claims cannot be denied after 8 continuous policy years except in case of fraud.

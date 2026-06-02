@@ -1,0 +1,450 @@
+{
+    "health advantedge plus|icici lombard": {
+        "score": 9.18,
+        "positives": 25.7,
+        "total": 28,
+        "company": "ICICI Lombard",
+        "plan_name": "Health AdvantEdge Plus"
+    },
+    "elevate (basic)|icici lombard": {
+        "score": 9.36,
+        "positives": 26.2,
+        "total": 28,
+        "company": "ICICI Lombard",
+        "plan_name": "Elevate (Basic)"
+    },
+    "elevate (essential)|icici lombard": {
+        "score": 9.79,
+        "positives": 27.4,
+        "total": 28,
+        "company": "ICICI Lombard",
+        "plan_name": "Elevate (Essential)"
+    },
+    "elevate (recommended)|icici lombard": {
+        "score": 9.79,
+        "positives": 27.4,
+        "total": 28,
+        "company": "ICICI Lombard",
+        "plan_name": "Elevate (Recommended)"
+    },
+    "max protect (classic)|icici lombard": {
+        "score": 8.36,
+        "positives": 23.4,
+        "total": 28,
+        "company": "ICICI Lombard",
+        "plan_name": "Max Protect (Classic)"
+    },
+    "max protect (premium)|icici lombard": {
+        "score": 9.79,
+        "positives": 27.4,
+        "total": 28,
+        "company": "ICICI Lombard",
+        "plan_name": "Max Protect (Premium)"
+    },
+    "reassure|niva bupa": {
+        "score": 9.57,
+        "positives": 26.8,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "ReAssure"
+    },
+    "reassure 2.0 (titanium+)|niva bupa": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "ReAssure 2.0 (Titanium+)"
+    },
+    "reassure 2.0 (platinum+)|niva bupa": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "ReAssure 2.0 (Platinum+)"
+    },
+    "reassure 2.0 (bronze+)|niva bupa": {
+        "score": 8.68,
+        "positives": 24.3,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "ReAssure 2.0 (Bronze+)"
+    },
+    "reassure 2.0 (gold)|niva bupa": {
+        "score": 9.14,
+        "positives": 25.6,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "ReAssure 2.0 (Gold)"
+    },
+    "reassure 2.0 (bronze)|niva bupa": {
+        "score": 8.68,
+        "positives": 24.3,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "ReAssure 2.0 (Bronze)"
+    },
+    "aspire (gold+)|niva bupa": {
+        "score": 8.86,
+        "positives": 24.8,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "Aspire (Gold+)"
+    },
+    "aspire (diamond+)|niva bupa": {
+        "score": 8.93,
+        "positives": 25.0,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "Aspire (Diamond+)"
+    },
+    "aspire (platinum+)|niva bupa": {
+        "score": 8.93,
+        "positives": 25.0,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "Aspire (Platinum+)"
+    },
+    "aspire (titanium+)|niva bupa": {
+        "score": 8.93,
+        "positives": 25.0,
+        "total": 28,
+        "company": "Niva Bupa",
+        "plan_name": "Aspire (Titanium+)"
+    },
+    "care|care health": {
+        "score": 8.79,
+        "positives": 24.6,
+        "total": 28,
+        "company": "Care Health",
+        "plan_name": "Care"
+    },
+    "care supreme|care health": {
+        "score": 9.14,
+        "positives": 25.6,
+        "total": 28,
+        "company": "Care Health",
+        "plan_name": "Care Supreme"
+    },
+    "care advantage|care health": {
+        "score": 8.89,
+        "positives": 24.9,
+        "total": 28,
+        "company": "Care Health",
+        "plan_name": "Care Advantage"
+    },
+    "care senior|care health": {
+        "score": 6.89,
+        "positives": 19.3,
+        "total": 28,
+        "company": "Care Health",
+        "plan_name": "Care Senior"
+    },
+    "care heart|care health": {
+        "score": 7.57,
+        "positives": 21.2,
+        "total": 28,
+        "company": "Care Health",
+        "plan_name": "Care Heart"
+    },
+    "care freedom|care health": {
+        "score": 7.93,
+        "positives": 22.2,
+        "total": 28,
+        "company": "Care Health",
+        "plan_name": "Care Freedom"
+    },
+    "prohealth prime protect|manipalcigna": {
+        "score": 9.0,
+        "positives": 25.2,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "ProHealth Prime Protect"
+    },
+    "life time health (india)|manipalcigna": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "Life Time Health (India)"
+    },
+    "sarvah- uttam plan|manipalcigna": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "Sarvah- Uttam Plan"
+    },
+    "param plan|manipalcigna": {
+        "score": 9.21,
+        "positives": 25.8,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "Param Plan"
+    },
+    "pratham plan|manipalcigna": {
+        "score": 9.21,
+        "positives": 25.8,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "Pratham Plan"
+    },
+    "prime senior (elite)|manipalcigna": {
+        "score": 9.07,
+        "positives": 25.4,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "Prime Senior (Elite)"
+    },
+    "prime senior|manipalcigna": {
+        "score": 8.64,
+        "positives": 24.2,
+        "total": 28,
+        "company": "ManipalCigna",
+        "plan_name": "Prime Senior"
+    },
+    "optima restore|hdfc ergo": {
+        "score": 9.14,
+        "positives": 25.6,
+        "total": 28,
+        "company": "HDFC Ergo",
+        "plan_name": "Optima Restore"
+    },
+    "optima secure|hdfc ergo": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "HDFC Ergo",
+        "plan_name": "Optima Secure"
+    },
+    "flexi retail health|chola ms": {
+        "score": 8.54,
+        "positives": 23.9,
+        "total": 28,
+        "company": "Chola MS",
+        "plan_name": "Flexi Retail Health"
+    },
+    "flexi health supreme (plus)|chola ms": {
+        "score": 9.57,
+        "positives": 26.8,
+        "total": 28,
+        "company": "Chola MS",
+        "plan_name": "Flexi Health Supreme (Plus)"
+    },
+    "flexi health supreme (premier)|chola ms": {
+        "score": 9.21,
+        "positives": 25.8,
+        "total": 28,
+        "company": "Chola MS",
+        "plan_name": "Flexi Health Supreme (Premier)"
+    },
+    "family health optima|star health": {
+        "score": 8.29,
+        "positives": 23.2,
+        "total": 28,
+        "company": "Star Health",
+        "plan_name": "Family Health Optima"
+    },
+    "star health assure insurance policy|star health": {
+        "score": 9.21,
+        "positives": 25.8,
+        "total": 28,
+        "company": "Star Health",
+        "plan_name": "Star Health Assure Insurance Policy"
+    },
+    "star comprehensive|star health": {
+        "score": 9.57,
+        "positives": 26.8,
+        "total": 28,
+        "company": "Star Health",
+        "plan_name": "Star Comprehensive"
+    },
+    "young star|star health": {
+        "score": 7.57,
+        "positives": 21.2,
+        "total": 28,
+        "company": "Star Health",
+        "plan_name": "Young Star"
+    },
+    "medicare|tata general insurance": {
+        "score": 8.71,
+        "positives": 24.4,
+        "total": 28,
+        "company": "Tata General Insurance",
+        "plan_name": "Medicare"
+    },
+    "medicare premier|tata general insurance": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "Tata General Insurance",
+        "plan_name": "Medicare Premier"
+    },
+    "health infinity|reliance health insurance": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "Reliance Health Insurance",
+        "plan_name": "Health Infinity"
+    },
+    "health gain|reliance health insurance": {
+        "score": 8.86,
+        "positives": 24.8,
+        "total": 28,
+        "company": "Reliance Health Insurance",
+        "plan_name": "Health Gain"
+    },
+    "support|magma hdi": {
+        "score": 7.64,
+        "positives": 21.4,
+        "total": 28,
+        "company": "Magma Hdi",
+        "plan_name": "Support"
+    },
+    "secure plan|magma hdi": {
+        "score": 9.36,
+        "positives": 26.2,
+        "total": 28,
+        "company": "Magma Hdi",
+        "plan_name": "Secure Plan"
+    },
+    "support plus|magma hdi": {
+        "score": 9.07,
+        "positives": 25.4,
+        "total": 28,
+        "company": "Magma Hdi",
+        "plan_name": "Support Plus"
+    },
+    "shield|magma hdi": {
+        "score": 9.07,
+        "positives": 25.4,
+        "total": 28,
+        "company": "Magma Hdi",
+        "plan_name": "Shield"
+    },
+    "premium|magma hdi": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "Magma Hdi",
+        "plan_name": "Premium"
+    },
+    "health guard- gold plan|bajaj allianz": {
+        "score": 8.64,
+        "positives": 24.2,
+        "total": 28,
+        "company": "Bajaj Allianz",
+        "plan_name": "Health Guard- Gold Plan"
+    },
+    "health guard- platinum plan|bajaj allianz": {
+        "score": 8.96,
+        "positives": 25.1,
+        "total": 28,
+        "company": "Bajaj Allianz",
+        "plan_name": "Health Guard- Platinum Plan"
+    },
+    "health guard- silver plan|bajaj allianz": {
+        "score": 8.0,
+        "positives": 22.4,
+        "total": 28,
+        "company": "Bajaj Allianz",
+        "plan_name": "Health Guard- Silver Plan"
+    },
+    "secure health connect- basic|liberty general insurance": {
+        "score": 8.89,
+        "positives": 24.9,
+        "total": 28,
+        "company": "Liberty General Insurance",
+        "plan_name": "Secure Health Connect- Basic"
+    },
+    "secure elite|liberty general insurance": {
+        "score": 9.11,
+        "positives": 25.5,
+        "total": 28,
+        "company": "Liberty General Insurance",
+        "plan_name": "Secure Elite"
+    },
+    "secure supreme|liberty general insurance": {
+        "score": 8.54,
+        "positives": 23.9,
+        "total": 28,
+        "company": "Liberty General Insurance",
+        "plan_name": "Secure Supreme"
+    },
+    "secure complete|liberty general insurance": {
+        "score": 9.11,
+        "positives": 25.5,
+        "total": 28,
+        "company": "Liberty General Insurance",
+        "plan_name": "Secure Complete"
+    },
+    "super health- elite|sbi general insurance": {
+        "score": 9.14,
+        "positives": 25.6,
+        "total": 28,
+        "company": "SBI General Insurance",
+        "plan_name": "Super Health- Elite"
+    },
+    "premier plan|sbi general insurance": {
+        "score": 9.57,
+        "positives": 26.8,
+        "total": 28,
+        "company": "SBI General Insurance",
+        "plan_name": "Premier Plan"
+    },
+    "platinum plan|sbi general insurance": {
+        "score": 9.57,
+        "positives": 26.8,
+        "total": 28,
+        "company": "SBI General Insurance",
+        "plan_name": "Platinum Plan"
+    },
+    "platinum infinite|sbi general insurance": {
+        "score": 9.21,
+        "positives": 25.8,
+        "total": 28,
+        "company": "SBI General Insurance",
+        "plan_name": "Platinum Infinite"
+    },
+    "activ health platinum (enhanced)|aditya birla": {
+        "score": 9.93,
+        "positives": 27.8,
+        "total": 28,
+        "company": "Aditya Birla",
+        "plan_name": "Activ Health Platinum (Enhanced)"
+    },
+    "essential plan|aditya birla": {
+        "score": 7.64,
+        "positives": 21.4,
+        "total": 28,
+        "company": "Aditya Birla",
+        "plan_name": "Essential Plan"
+    },
+    "premier plan|aditya birla": {
+        "score": 10.0,
+        "positives": 28.0,
+        "total": 28,
+        "company": "Aditya Birla",
+        "plan_name": "Premier Plan"
+    },
+    "activ health plus (enhanced)|aditya birla": {
+        "score": 9.5,
+        "positives": 26.6,
+        "total": 28,
+        "company": "Aditya Birla",
+        "plan_name": "Activ Health Plus (Enhanced)"
+    },
+    "essential plus|aditya birla": {
+        "score": 7.29,
+        "positives": 20.4,
+        "total": 28,
+        "company": "Aditya Birla",
+        "plan_name": "Essential Plus"
+    },
+    "premier plus|aditya birla": {
+        "score": 9.64,
+        "positives": 27.0,
+        "total": 28,
+        "company": "Aditya Birla",
+        "plan_name": "Premier Plus"
+    }
+}

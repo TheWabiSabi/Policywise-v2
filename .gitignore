@@ -1,0 +1,15 @@
+# Sensitive Data
+.env
+
+# Python Environment
+venv/
+__pycache__/
+*.py[cod]
+
+# Node/Frontend
+node_modules/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db.env

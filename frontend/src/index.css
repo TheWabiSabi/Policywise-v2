@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+  @page {
+    margin: 5mm;
+    size: auto;
+  }
+
+  /* Hide unnecessary elements */
+  header,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Scale down to fit 3 pages */
+  body {
+    zoom: 0.8 !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Main container adjustments */
+  main {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 1. EXTRACTED POLICY DETAILS in first one page */
+  #extracted-policy-card {
+    break-after: page !important;
+    min-height: 90vh !important; /* Visual centering/occupying page */
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* 2. Continuous flow for Recommendations ("Basic Coverage to last continue") */
+  /* Allow breaking generally, but protect individual cards */
+  .break-inside-avoid {
+    break-inside: avoid !important;
+  }
+  
+  /* Ensure titles stick to their content */
+  h4, h5, h6 {
+    break-after: avoid !important;
+  }
+
+  /* Compact spacing for print to help fit in 3 pages */
+  .space-y-10 {
+    margin-bottom: 2rem !important; /* Reduce gap */
+  }
+  
+  /* Ensure background colors print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

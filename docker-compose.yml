@@ -1,0 +1,21 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+
+    volumes:
+      - ./backend/.env:/app/.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5174:80" # Maps port 5174 on your machine to Nginx port 80
+    depends_on:
+      - backend
+    restart: unless-stopped
