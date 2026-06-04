@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '../supabaseClient';
+import { auth } from '../authClient';
 import { toast } from 'react-hot-toast';
 
 // --- THE API BRIDGE ---
@@ -108,7 +109,7 @@ const callBackend = async (endpoint, body, isFile = false, token = null) => {
   // ensure we always have a fresh token if possible
   let activeToken = token;
   if (!activeToken) {
-    const { data: { session: freshSession } } = await supabase.auth.getSession();
+    const { data: { session: freshSession } } = await auth.getSession();
     activeToken = freshSession?.access_token;
   }
 
@@ -427,7 +428,7 @@ export default function Analyzer({ session, fullName }) {
         try {
           // Since callBackend defaults to POST and we only have a GET endpoint, 
           // let's fetch it manually with auth token or adjust callBackend params.
-          const { data: { session: freshSession } } = await supabase.auth.getSession();
+          const { data: { session: freshSession } } = await auth.getSession();
           const token = freshSession?.access_token;
 
           const chatRes = await fetch(`${API_BASE}/chats/${id}`, {
@@ -545,7 +546,7 @@ export default function Analyzer({ session, fullName }) {
           return reject(new Error('Analysis timed out after 3 minutes. Please try again.'));
         }
         try {
-          const { data: { session: s } } = await supabase.auth.getSession();
+          const { data: { session: s } } = await auth.getSession();
           const res = await fetch(`${API_BASE}/job/${jobId}`, {
             headers: { 'Authorization': `Bearer ${s?.access_token}` }
           });
@@ -751,7 +752,7 @@ export default function Analyzer({ session, fullName }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     localStorage.clear();
     navigate('/login');
   };

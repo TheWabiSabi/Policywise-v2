@@ -1,23 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { auth } from '../authClient';
 import { toast } from 'react-hot-toast';
-import { Phone } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 
 import { API_BASE } from '../config';
-
-const countryList = [
-    { code: '+91', flag: '🇮🇳', name: 'India' },
-    { code: '+1', flag: '🇺🇸', name: 'United States' },
-    { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
-    { code: '+61', flag: '🇦🇺', name: 'Australia' },
-    { code: '+81', flag: '🇯🇵', name: 'Japan' },
-    { code: '+86', flag: '🇨🇳', name: 'China' },
-    { code: '+49', flag: '🇩🇪', name: 'Germany' },
-    { code: '+33', flag: '🇫🇷', name: 'France' },
-    { code: '+971', flag: '🇦🇪', name: 'United Arab Emirates' },
-];
 
 export default function Settings({ session, fullName, username, onProfileUpdate }) {
     const navigate = useNavigate();
@@ -30,21 +18,7 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [localUsername, setLocalUsername] = useState('');
-    const [countryCode, setCountryCode] = useState('+91');
-    const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
-    const dropdownRef = useRef(null);
-    const [phone, setPhone] = useState('');
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsCountryDropdownOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
 
     // Initialize from props
     useEffect(() => {
@@ -75,18 +49,6 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
                 setFirstName(parts[0] || '');
                 setLastName(parts.slice(1).join(' ') || '');
                 setLocalUsername(data.username || '');
-                
-                // Pull phone directly from Auth user metadata since it's not a column in profiles
-                const userPhone = session?.user?.user_metadata?.phone;
-                if (userPhone) {
-                    const phoneParts = userPhone.split(' ');
-                    if (phoneParts.length > 1) {
-                        setCountryCode(phoneParts[0]);
-                        setPhone(phoneParts.slice(1).join(''));
-                    } else {
-                        setPhone(userPhone);
-                    }
-                }
             }
         } catch (err) {
             console.error("Error fetching profile:", err);
@@ -124,14 +86,6 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
 
             if (onProfileUpdate) onProfileUpdate();
 
-            // Also update Auth metadata for session consistency
-            await supabase.auth.updateUser({
-                data: {
-                    full_name: newFullName,
-                    username: newUsername
-                }
-            });
-
         } catch (err) {
             console.error("Save Error:", err);
             let msg = err.message;
@@ -155,7 +109,7 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
 
         try {
             // Ensure we have a fresh token
-            const { data: { session: freshSession } } = await supabase.auth.getSession();
+            const { data: { session: freshSession } } = await auth.getSession();
             const activeToken = freshSession?.access_token || session?.access_token;
 
             if (!activeToken) throw new Error("No active session found. Please log in again.");
@@ -172,7 +126,7 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
                 throw new Error(data.detail || "Failed to delete account");
             }
 
-            await supabase.auth.signOut();
+            await auth.signOut();
             localStorage.clear();
             sessionStorage.clear();
 
@@ -245,13 +199,6 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
                             </p>
                         </div>
 
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Phone Number</label>
-                            <p className="text-slate-500 font-medium bg-slate-50/50 p-3 rounded-xl border border-slate-100 opacity-70">
-                                {phone ? `${countryCode} ${phone}` : session?.user?.user_metadata?.phone || "Not provided"}
-                            </p>
-                        </div>
-
                         <button
                             onClick={handleSaveProfile}
                             disabled={saving}
@@ -302,7 +249,7 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
                     </button>
                     <button
                         onClick={async () => {
-                            await supabase.auth.signOut();
+                            await auth.signOut();
                             localStorage.clear();
                             sessionStorage.clear();
                             navigate('/login');

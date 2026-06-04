@@ -47,7 +47,6 @@ export default function Auth({ onAuthSuccess }) {
     // signup fields
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [phone, setPhone] = useState('');
     const [emailError, setEmailError] = useState('');
 
     // confirm OTP
@@ -110,6 +109,16 @@ export default function Auth({ onAuthSuccess }) {
         }
     };
 
+    const handleGoogleSignIn = () => {
+        setLoading(true);
+        try {
+            auth.signInWithGoogle();
+        } catch (err) {
+            setLoading(false);
+            toast.error(err.message || 'Google sign in failed.');
+        }
+    };
+
     // ── SIGN UP ────────────────────────────────────────────────────────────
     const handleSignUp = async (e) => {
         e.preventDefault();
@@ -121,7 +130,6 @@ export default function Auth({ onAuthSuccess }) {
                 password,
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
-                phone: phone.trim() || undefined,
             });
             setPendingEmail(email.trim());
             toast.success('Account created! Check your email for the OTP code. 📬', { duration: 5000 });
@@ -278,6 +286,22 @@ export default function Auth({ onAuthSuccess }) {
                             </div>
 
                             <form className="space-y-5" onSubmit={handleSignIn} onKeyDown={handleKeyDown}>
+                                <button
+                                    type="button"
+                                    onClick={handleGoogleSignIn}
+                                    disabled={loading}
+                                    className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
+                                    Continue with Google
+                                </button>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">or</span>
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                                     <div className="relative group">
@@ -324,6 +348,22 @@ export default function Auth({ onAuthSuccess }) {
                             </div>
 
                             <form className="space-y-5" onSubmit={handleSignUp} onKeyDown={handleKeyDown}>
+                                <button
+                                    type="button"
+                                    onClick={handleGoogleSignIn}
+                                    disabled={loading}
+                                    className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
+                                    Continue with Google
+                                </button>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">or</span>
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                </div>
+
                                 {/* First + Last name */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -354,16 +394,6 @@ export default function Auth({ onAuthSuccess }) {
                                         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className={inputCls(!!emailError)} />
                                     </div>
                                     {emailError && <p className="text-xs text-rose-600 mt-1.5 font-medium">{emailError}</p>}
-                                </div>
-
-                                {/* Phone (optional) */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone <span className="text-slate-400 font-normal">(optional)</span></label>
-                                    <input
-                                        type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                                        placeholder="+91 98765 43210"
-                                        className="appearance-none block w-full px-3 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all sm:text-sm"
-                                    />
                                 </div>
 
                                 {/* Password */}

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { auth } from '../authClient';
 
 export default function UpdatePassword() {
     const [password, setPassword] = useState('');
@@ -8,13 +7,10 @@ export default function UpdatePassword() {
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
-    const navigate = useNavigate();
-
     useEffect(() => {
-        // When clicking a reset link, Supabase appends #access_token=... to the URL.
-        // We verify that a session exists (the user is implicitly logged in by clicking the link)
         const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+            await auth.completeHostedAuthFromUrl();
+            const { data: { session } } = await auth.getSession();
             if (!session) {
                 // If there's no session, the link might be expired or invalid
                 setErrorMsg('Invalid or expired password reset link. Please try requesting a new one.');
@@ -42,19 +38,14 @@ export default function UpdatePassword() {
         }
 
         try {
-            // [PHASE 25] Update the user's password securely
-            const { error } = await supabase.auth.updateUser({
-                password: password
-            });
-
-            if (error) throw error;
+            await auth.updatePassword({ new_password: password });
 
             setSuccessMsg('Your password has been updated successfully!');
             
             // Redirect to login after 3 seconds
             setTimeout(async () => {
                 // Ensure they are fully logged out so they can log back in with the new password
-                await supabase.auth.signOut();
+                await auth.signOut();
                 
                 // Use a hard redirect instead of react-router navigate to forcefully clear ALL App.jsx 
                 // Context / State and prevent any race conditions with the 'session' routing.

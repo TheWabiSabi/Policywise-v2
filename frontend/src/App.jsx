@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { auth, apiFetch, clearTokens } from './authClient';
+import { auth, apiFetch } from './authClient';
 import { Toaster, toast } from 'react-hot-toast';
 
 // Components
@@ -10,14 +10,12 @@ import AdminDashboard from './components/AdminDashboard';
 import Analyzer from './components/Analyzer';
 import Settings from './components/Settings';
 import UpdatePassword from './components/UpdatePassword';
-import PhoneVerificationGate from './components/PhoneVerificationGate';
 
 export default function App() {
     const [session, setSession] = useState(null);
     const [role, setRole] = useState(null);
     const [fullName, setFullName] = useState(null);
     const [username, setUsername] = useState(null);
-    const [phoneVerified, setPhoneVerified] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -27,24 +25,17 @@ export default function App() {
             console.log("DEBUG: initializeSession started");
 
             try {
+                await auth.completeHostedAuthFromUrl();
                 const { data: { session: currentSession } } = await auth.getSession();
                 console.log("DEBUG: getSession returned", currentSession);
 
                 if (!mounted) return;
 
                 if (currentSession) {
-                    // Check if they are halfway through a phone verification signup
-                    if (sessionStorage.getItem('signup_in_progress') === 'true') {
-                        console.log("DEBUG: Abandoned mid-signup detected during refresh. Cleaning up.");
-                        await auth.signOut();
-                        sessionStorage.removeItem('signup_in_progress');
-                        if (mounted) setLoading(false);
-                        return;
-                    }
-
                     await fetchUserData();
                     if (mounted) {
-                        setSession(currentSession);
+                        const { data: { session: freshSession } } = await auth.getSession();
+                        setSession(freshSession);
                         setLoading(false);
                     }
                 } else {
@@ -60,10 +51,6 @@ export default function App() {
 
         const { data: { subscription } } = auth.onAuthStateChange(async (event, sessionData) => {
             if (event === 'SIGNED_IN' && sessionData) {
-                if (sessionStorage.getItem('signup_in_progress') === 'true') {
-                    console.log("DEBUG: Signup in progress, holding router at /login.");
-                    return;
-                }
                 await fetchUserData();
                 const { data: { session: freshSession } } = await auth.getSession();
                 if (mounted) setSession(freshSession);
@@ -73,7 +60,6 @@ export default function App() {
                     setRole(null);
                     setFullName(null);
                     setUsername(null);
-                    setPhoneVerified(null);
                     setLoading(false);
                 }
             }
@@ -85,7 +71,7 @@ export default function App() {
         };
     }, []);
 
-    const fetchUserData = async (userIdUnused) => {
+    const fetchUserData = async () => {
         console.log("DEBUG: fetchUserData started");
         try {
             // Fetch the user from the Cognito auth service
@@ -98,12 +84,10 @@ export default function App() {
                 const userRole = userData.role || userData['custom:role'] || 'client';
                 const userFullName = userData.name || userData.full_name || userData.username || userData.email || '';
                 const userUsername = userData.username || userData.email || '';
-                const userPhone = userData.phone || userData.phone_number || null;
 
                 setRole(userRole);
                 setFullName(userFullName);
                 setUsername(userUsername);
-                setPhoneVerified(!!userPhone);
             } else {
                 console.warn("DEBUG: No user data returned. Signing out.");
                 toast.error("Could not load user profile. Please sign in again.", { duration: 6000 });
@@ -112,7 +96,6 @@ export default function App() {
                 setRole(null);
                 setFullName(null);
                 setUsername(null);
-                setPhoneVerified(null);
                 setLoading(false);
             }
         } catch (err) {
@@ -124,7 +107,6 @@ export default function App() {
                     setRole(profile.role || 'client');
                     setFullName(profile.full_name || profile.name || '');
                     setUsername(profile.username || '');
-                    setPhoneVerified(!!profile.phone);
                 }
             } catch (profileErr) {
                 console.error("DEBUG: /users/profile fallback also failed", profileErr);
@@ -172,15 +154,6 @@ export default function App() {
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <div className="text-slate-500 font-bold animate-pulse text-sm uppercase tracking-widest">Verifying Session...</div>
             </div>
-        );
-    }
-
-    if (session && phoneVerified === false) {
-        return (
-            <>
-                <Toaster position="top-right" />
-                <PhoneVerificationGate session={session} onVerified={(newPhone) => setPhoneVerified(true)} />
-            </>
         );
     }
 

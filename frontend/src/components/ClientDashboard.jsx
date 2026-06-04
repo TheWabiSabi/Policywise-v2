@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { auth } from '../authClient';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal';
@@ -43,7 +44,7 @@ export default function ClientDashboard({ session, fullName }) {
     };
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut();
+        await auth.signOut();
         localStorage.clear();
         sessionStorage.clear();
         // React Router via App.jsx will automatically redirect to /login
@@ -69,7 +70,7 @@ export default function ClientDashboard({ session, fullName }) {
         // Fire-and-forget API call in background
         (async () => {
             try {
-                const { data: { session: freshSession } } = await supabase.auth.getSession();
+                const { data: { session: freshSession } } = await auth.getSession();
                 const token = freshSession?.access_token;
 
                 const res = await fetch(`${API_BASE}/analysis/${id}`, {
