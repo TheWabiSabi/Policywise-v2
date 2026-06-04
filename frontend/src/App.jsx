@@ -25,7 +25,6 @@ export default function App() {
             console.log("DEBUG: initializeSession started");
 
             try {
-                await auth.completeHostedAuthFromUrl();
                 const { data: { session: currentSession } } = await auth.getSession();
                 console.log("DEBUG: getSession returned", currentSession);
 
@@ -53,7 +52,10 @@ export default function App() {
             if (event === 'SIGNED_IN' && sessionData) {
                 await fetchUserData();
                 const { data: { session: freshSession } } = await auth.getSession();
-                if (mounted) setSession(freshSession);
+                if (mounted) {
+                    setSession(freshSession);
+                    setLoading(false);
+                }
             } else if (event === 'SIGNED_OUT') {
                 if (mounted) {
                     setSession(null);
@@ -71,6 +73,17 @@ export default function App() {
         };
     }, []);
 
+    const applyUserData = (userData = {}) => {
+        // Auth is owned by Cognito/NestJS now; profile data is useful for UI,
+        // but missing profile fields should not block a valid login session.
+        const userRole = userData.role || userData['custom:role'] || 'client';
+        const userFullName = userData.name || userData.full_name || userData.username || userData.email || '';
+        const userUsername = userData.username || userData.email || '';
+        setRole(userRole);
+        setFullName(userFullName);
+        setUsername(userUsername);
+    };
+
     const fetchUserData = async () => {
         console.log("DEBUG: fetchUserData started");
         try {
@@ -79,37 +92,41 @@ export default function App() {
             console.log("DEBUG: getUser returned", userData);
 
             if (userData) {
-                // Map Cognito user fields to the existing role/profile structure.
-                // Cognito doesn't have roles by default — use custom attribute or default to 'client'.
-                const userRole = userData.role || userData['custom:role'] || 'client';
-                const userFullName = userData.name || userData.full_name || userData.username || userData.email || '';
-                const userUsername = userData.username || userData.email || '';
-
-                setRole(userRole);
-                setFullName(userFullName);
-                setUsername(userUsername);
-            } else {
-                console.warn("DEBUG: No user data returned. Signing out.");
-                toast.error("Could not load user profile. Please sign in again.", { duration: 6000 });
-                await auth.signOut();
-                setSession(null);
-                setRole(null);
-                setFullName(null);
-                setUsername(null);
-                setLoading(false);
+                applyUserData(userData);
+                return;
             }
+
+            const { data: { session: currentSession } } = await auth.getSession();
+            if (currentSession) {
+                console.warn("DEBUG: Profile unavailable. Continuing with authenticated session.");
+                applyUserData(currentSession.user || {});
+                return;
+            }
+
+            console.warn("DEBUG: No auth session found after profile lookup. Signing out.");
+            await auth.signOut();
+            setSession(null);
+            setRole(null);
+            setFullName(null);
+            setUsername(null);
+            setLoading(false);
         } catch (err) {
             console.error("DEBUG: Error fetching user profile data", err);
             // Try /users/profile as fallback
             try {
                 const profile = await apiFetch('/users/profile');
                 if (profile) {
-                    setRole(profile.role || 'client');
-                    setFullName(profile.full_name || profile.name || '');
-                    setUsername(profile.username || '');
+                    applyUserData(profile);
+                    return;
                 }
             } catch (profileErr) {
                 console.error("DEBUG: /users/profile fallback also failed", profileErr);
+            }
+
+            const { data: { session: currentSession } } = await auth.getSession();
+            if (currentSession) {
+                console.warn("DEBUG: Continuing with cached authenticated session after profile errors.");
+                applyUserData(currentSession.user || {});
             }
         }
     };

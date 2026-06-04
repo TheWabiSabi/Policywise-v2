@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { auth } from '../authClient';
 import { toast } from 'react-hot-toast';
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, Zap, FileSearch, KeyRound } from 'lucide-react';
@@ -38,6 +38,8 @@ function SubmitButton({ loading, label, loadingLabel, disabled }) {
 export default function Auth({ onAuthSuccess }) {
     const [view, setView] = useState('signin');
     const [loading, setLoading] = useState(false);
+    const googleButtonRef = useRef(null);
+    const [googleReady, setGoogleReady] = useState(false);
 
     // shared fields
     const [email, setEmail] = useState('');
@@ -65,6 +67,39 @@ export default function Auth({ onAuthSuccess }) {
         if (!email) { setEmailError(''); return; }
         setEmailError(emailRegex.test(email.trim()) ? '' : 'Please enter a valid email address.');
     }, [email, view]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        // Initialize Google Identity Services for the NestJS /auth/google exchange.
+        auth.initializeGoogle(
+            () => {
+                toast.success('Signed in with Google.', { duration: 2000 });
+                if (onAuthSuccess) onAuthSuccess();
+                else window.location.reload();
+            },
+            (err) => toast.error(err.message || 'Google sign in failed.')
+        ).then(() => {
+            if (cancelled) return;
+            setGoogleReady(true);
+            if (googleButtonRef.current && window.google?.accounts?.id) {
+                googleButtonRef.current.innerHTML = '';
+                window.google.accounts.id.renderButton(googleButtonRef.current, {
+                    theme: 'outline',
+                    size: 'large',
+                    type: 'standard',
+                    shape: 'rectangular',
+                    text: 'continue_with',
+                    logo_alignment: 'left',
+                    width: googleButtonRef.current.offsetWidth || 384,
+                });
+            }
+        }).catch((err) => {
+            console.warn('Google sign-in unavailable:', err);
+        });
+
+        return () => { cancelled = true; };
+    }, [onAuthSuccess, view]);
 
     // ── Enter-key progression ──────────────────────────────────────────────
     const handleKeyDown = (e) => {
@@ -109,13 +144,22 @@ export default function Auth({ onAuthSuccess }) {
         }
     };
 
-    const handleGoogleSignIn = () => {
-        setLoading(true);
+    const handleGoogleSignIn = async () => {
         try {
-            auth.signInWithGoogle();
+            // Fallback initialization path for browsers that load GSI late.
+            if (!googleReady) {
+                await auth.initializeGoogle(
+                    () => {
+                        if (onAuthSuccess) onAuthSuccess();
+                        else window.location.reload();
+                    },
+                    (err) => toast.error(err.message || 'Google sign in failed.')
+                );
+                setGoogleReady(true);
+            }
+            auth.promptGoogle();
         } catch (err) {
-            setLoading(false);
-            toast.error(err.message || 'Google sign in failed.');
+            toast.error(err.message || 'Google sign in is not available.');
         }
     };
 
@@ -286,15 +330,18 @@ export default function Auth({ onAuthSuccess }) {
                             </div>
 
                             <form className="space-y-5" onSubmit={handleSignIn} onKeyDown={handleKeyDown}>
-                                <button
-                                    type="button"
-                                    onClick={handleGoogleSignIn}
-                                    disabled={loading}
-                                    className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
-                                    Continue with Google
-                                </button>
+                                <div ref={googleButtonRef} className="w-full min-h-[44px]" />
+                                {!googleReady && (
+                                    <button
+                                        type="button"
+                                        onClick={handleGoogleSignIn}
+                                        disabled={loading}
+                                        className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
+                                        Continue with Google
+                                    </button>
+                                )}
 
                                 <div className="flex items-center gap-3">
                                     <div className="h-px flex-1 bg-slate-200" />
@@ -348,15 +395,18 @@ export default function Auth({ onAuthSuccess }) {
                             </div>
 
                             <form className="space-y-5" onSubmit={handleSignUp} onKeyDown={handleKeyDown}>
-                                <button
-                                    type="button"
-                                    onClick={handleGoogleSignIn}
-                                    disabled={loading}
-                                    className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
-                                    Continue with Google
-                                </button>
+                                <div ref={googleButtonRef} className="w-full min-h-[44px]" />
+                                {!googleReady && (
+                                    <button
+                                        type="button"
+                                        onClick={handleGoogleSignIn}
+                                        disabled={loading}
+                                        className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
+                                        Continue with Google
+                                    </button>
+                                )}
 
                                 <div className="flex items-center gap-3">
                                     <div className="h-px flex-1 bg-slate-200" />

@@ -4,23 +4,14 @@
  * access_token in localStorage, refresh_token in httpOnly cookie.
  */
 
-import { API_BASE, AUTH_SERVICE_URL } from './config';
-
-const AUTH_BASE = AUTH_SERVICE_URL;
+// Empty default lets Vite proxy /auth to the NestJS service during local dev.
+const AUTH_BASE = import.meta.env.VITE_AUTH_SERVICE_URL || '';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 const KEYS = {
   ACCESS: 'pw_access_token',
   USER: 'pw_user',
-  OAUTH_STATE: 'pw_oauth_state',
 };
-
-function normalizeAuthBase() {
-  return AUTH_BASE.replace(/\/$/, '');
-}
-
-function getRedirectUri() {
-  return import.meta.env.VITE_AUTH_REDIRECT_URI || `${window.location.origin}/login`;
-}
 
 // ── token helpers ─────────────────────────────────────────────────────────
 export function getAccessToken() {
@@ -31,41 +22,59 @@ function setAccessToken(token) {
   localStorage.setItem(KEYS.ACCESS, token);
 }
 
-function setStoredUser(user) {
-  if (user) localStorage.setItem(KEYS.USER, JSON.stringify(user));
-}
-
-export function getStoredUser() {
-  const raw = localStorage.getItem(KEYS.USER);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    localStorage.removeItem(KEYS.USER);
-    return null;
-  }
+function emitAuthChange() {
+  window.dispatchEvent(new Event('policywise-auth-change'));
 }
 
 function normalizeUser(user = {}) {
-  const id = user.id || user.sub || user.user_id || user.username || user.email || null;
-  const email = user.email || user.mail || null;
-  const name = user.name || user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ') || '';
+  // NestJS/Cognito can return snake_case attributes while the old app expects
+  // profile-ish fields. Normalize once so routing/header UI can stay simple.
+  const firstName = user.first_name || user.given_name || user.firstName || '';
+  const lastName = user.last_name || user.family_name || user.lastName || '';
+  const fullName = user.name || user.full_name || `${firstName} ${lastName}`.trim();
+  const id = user.sub || user.userId || user.user_id || user.username || user.email || null;
 
   return {
     ...user,
     id,
-    email,
-    name,
-    user_metadata: {
-      ...(user.user_metadata || {}),
-      full_name: user.full_name || name,
-      username: user.username || email,
-    },
+    sub: user.sub || user.userId || user.user_id || id,
+    email: user.email || '',
+    first_name: firstName,
+    last_name: lastName,
+    full_name: fullName,
+    name: fullName || user.username || user.email || '',
+    role: user.role || user['custom:role'] || 'client',
   };
+}
+
+function setCachedUser(user) {
+  const normalized = normalizeUser(user);
+  localStorage.setItem(KEYS.USER, JSON.stringify(normalized));
+  return normalized;
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1];
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decodeURIComponent(Array.from(json, (c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join('')));
+  } catch {
+    return {};
+  }
+}
+
+export function getCachedUser() {
+  try {
+    const raw = localStorage.getItem(KEYS.USER);
+    return raw ? normalizeUser(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearTokens() {
   Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
+  emitAuthChange();
 }
 
 export function isLoggedIn() {
@@ -78,7 +87,7 @@ async function authFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${normalizeAuthBase()}${path}`, {
+  const res = await fetch(`${AUTH_BASE}${path}`, {
     ...options,
     headers,
     credentials: 'include', // sends httpOnly refresh_token cookie
@@ -126,22 +135,26 @@ export const auth = {
       body: JSON.stringify({ email, password }),
     });
     if (data.access_token) setAccessToken(data.access_token);
-    if (data.user) setStoredUser(normalizeUser(data.user));
+    // Profile hydration is best-effort; routing should proceed once Cognito
+    // returns a valid access token even if /auth/profile is unavailable.
+    const user = await auth.getUser();
+    if (!user) setCachedUser({ email, username: email, role: 'client' });
+    emitAuthChange();
     return data;
   },
 
   /** Refresh — no body needed, browser sends cookie automatically */
   async refresh() {
-    const res = await fetch(`${normalizeAuthBase()}/auth/refresh`, {
+    const res = await fetch(`${AUTH_BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'Refresh failed');
+    if (!res.ok) throw Object.assign(new Error(data.message || 'Refresh failed'), { status: res.status });
     if (data.access_token) setAccessToken(data.access_token);
-    if (data.user) setStoredUser(normalizeUser(data.user));
     else throw new Error('Refresh failed');
+    emitAuthChange();
     return data;
   },
 
@@ -149,100 +162,101 @@ export const auth = {
   async getUser() {
     if (!getAccessToken()) return null;
     try {
-      const user = normalizeUser(await authFetch('/auth/profile'));
-      setStoredUser(user);
-      return user;
+      const user = await authFetch('/auth/profile');
+      return setCachedUser(user);
     } catch {
-      return null;
+      // Keep the current route alive when only profile hydration fails.
+      return getCachedUser();
     }
   },
 
   /** Sign out — clears local token + server clears cookies + invalidates Cognito session */
   async signOut() {
-    try {
-      await authFetch('/auth/logout', { method: 'POST' });
-    } catch {
-      // Local cleanup should still happen if the remote session is already gone.
-    }
+    try { await authFetch('/auth/logout', { method: 'POST' }); } catch { /* Logout remains local if the server call fails. */ }
     clearTokens();
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.disableAutoSelect();
+    }
   },
 
-  /** Redirect to the Cognito hosted service Google entrypoint. */
-  signInWithGoogle() {
-    const state = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
-    localStorage.setItem(KEYS.OAUTH_STATE, state);
-
-    const params = new URLSearchParams({
-      provider: 'Google',
-      redirect_uri: getRedirectUri(),
-      state,
+  async signInWithGoogle(idToken) {
+    // Browser gets a Google ID token; NestJS verifies it and returns Cognito tokens.
+    const data = await authFetch('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ idToken, id_token: idToken }),
     });
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (googleClientId) params.set('client_id', googleClientId);
-
-    const googlePath = import.meta.env.VITE_AUTH_GOOGLE_PATH || '/auth/google';
-    window.location.assign(`${normalizeAuthBase()}${googlePath}?${params.toString()}`);
-  },
-
-  /** Complete hosted OAuth when the auth service redirects back to /login. */
-  async completeHostedAuthFromUrl(url = window.location.href) {
-    const parsedUrl = new URL(url);
-    const hashParams = new URLSearchParams(parsedUrl.hash.replace(/^#/, ''));
-    const params = new URLSearchParams(parsedUrl.search);
-    const read = (key) => params.get(key) || hashParams.get(key);
-
-    const error = read('error') || read('error_description');
-    if (error) throw new Error(error);
-
-    const accessToken = read('access_token') || read('token');
-    if (accessToken) {
-      setAccessToken(accessToken);
-      const userParam = read('user');
-      if (userParam) {
-        try {
-          setStoredUser(normalizeUser(JSON.parse(decodeURIComponent(userParam))));
-        } catch {
-          // Some auth services return only tokens on callback.
-        }
-      }
-      window.history.replaceState({}, document.title, parsedUrl.pathname);
-      return { access_token: accessToken };
-    }
-
-    const code = read('code');
-    if (!code) return null;
-
-    const returnedState = read('state');
-    const storedState = localStorage.getItem(KEYS.OAUTH_STATE);
-    if (storedState && returnedState && storedState !== returnedState) {
-      throw new Error('Invalid sign-in state. Please try again.');
-    }
-
-    const callbackBody = JSON.stringify({
-      code,
-      redirect_uri: getRedirectUri(),
-      state: returnedState,
-    });
-
-    let data;
-    try {
-      data = await authFetch('/auth/callback', {
-        method: 'POST',
-        body: callbackBody,
-      });
-    } catch (err) {
-      if (err.status !== 404) throw err;
-      data = await authFetch('/auth/oauth/callback', {
-        method: 'POST',
-        body: callbackBody,
-      });
-    }
-
     if (data.access_token) setAccessToken(data.access_token);
-    if (data.user) setStoredUser(normalizeUser(data.user));
-    localStorage.removeItem(KEYS.OAUTH_STATE);
-    window.history.replaceState({}, document.title, parsedUrl.pathname);
+    // Cache Google profile claims as a fallback so a successful OAuth exchange
+    // can advance even before the backend profile endpoint responds.
+    const user = await auth.getUser();
+    if (!user) {
+      const claims = decodeJwtPayload(idToken);
+      setCachedUser({
+        email: claims.email,
+        name: claims.name,
+        first_name: claims.given_name,
+        last_name: claims.family_name,
+        username: claims.email,
+        role: 'client',
+      });
+    }
+    emitAuthChange();
     return data;
+  },
+
+  loadGoogleIdentity() {
+    // Load Google Identity Services only on the auth screen, keeping index.html clean.
+    return new Promise((resolve, reject) => {
+      if (!GOOGLE_CLIENT_ID) {
+        reject(new Error('Google client ID is not configured.'));
+        return;
+      }
+      if (window.google?.accounts?.id) {
+        resolve(window.google);
+        return;
+      }
+      const existing = document.getElementById('google-gsi-script');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.google), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Failed to load Google sign-in.')), { once: true });
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'google-gsi-script';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve(window.google);
+      script.onerror = () => reject(new Error('Failed to load Google sign-in.'));
+      document.head.appendChild(script);
+    });
+  },
+
+  async initializeGoogle(onSuccess, onError) {
+    const google = await auth.loadGoogleIdentity();
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: async ({ credential }) => {
+        try {
+          await auth.signInWithGoogle(credential);
+          onSuccess?.();
+        } catch (err) {
+          onError?.(err);
+        }
+      },
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      use_fedcm_for_prompt: true,
+      itp_support: true,
+      ux_mode: 'popup',
+    });
+  },
+
+  promptGoogle() {
+    if (!window.google?.accounts?.id) {
+      throw new Error('Google sign-in is not ready yet.');
+    }
+    window.google.accounts.id.prompt();
   },
 
   async forgotPassword(email) {
@@ -278,27 +292,26 @@ export const auth = {
   // App.jsx compat helpers
   async getSession() {
     const token = getAccessToken();
-    return {
-      data: {
-        session: token ? { access_token: token, user: getStoredUser() } : null,
-      },
-    };
+    const user = getCachedUser();
+    return { data: { session: token ? { access_token: token, user } : null } };
   },
 
   onAuthStateChange(callback) {
     const fire = () => {
       const token = getAccessToken();
-      if (token) callback('SIGNED_IN', { session: { access_token: token, user: getStoredUser() } });
+      if (token) callback('SIGNED_IN', { session: { access_token: token } });
       else callback('SIGNED_OUT', null);
     };
     window.addEventListener('storage', fire);
     window.addEventListener('focus', fire);
+    window.addEventListener('policywise-auth-change', fire);
     return {
       data: {
         subscription: {
           unsubscribe: () => {
             window.removeEventListener('storage', fire);
             window.removeEventListener('focus', fire);
+            window.removeEventListener('policywise-auth-change', fire);
           },
         },
       },
@@ -309,10 +322,11 @@ export const auth = {
 // ── API client for FastAPI backend (port 8000) ────────────────────────────
 export async function apiFetch(path, options = {}) {
   const token = getAccessToken();
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api';
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${apiBase}${path}`, {
     ...options,
     headers,
     credentials: 'include',
