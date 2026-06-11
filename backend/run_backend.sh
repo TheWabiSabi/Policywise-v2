@@ -2,13 +2,13 @@
 echo "Starting Backend..."
 
 # Check if venv exists
-if [ ! -d "venv" ]; then
+if [ ! -d ".venv" ]; then
     echo "Virtual environment not found! Please create it first using: python3 -m venv venv"
     exit 1
 fi
 
 # Activate the virtual environment
-source venv/bin/activate
+source .venv/bin/activate
 
 # Install requirements
 echo "Installing/Updating requirements..."

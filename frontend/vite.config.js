@@ -1,27 +1,27 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   server: {
     port: 3000,
     strictPort: true,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000',
+      "/api": {
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
-      '/auth': {
-        target: 'https://insurai-backend.shareindiainsurance.com',
+      "/auth": {
+        target: "https://insurai-backend.shareindiainsurance.com",
         changeOrigin: true,
       },
-      '/users': {
-        target: 'https://insurai-backend.shareindiainsurance.com',
+      "/users": {
+        target: "https://insurai-backend.shareindiainsurance.com",
         changeOrigin: true,
       },
-      '/health': {
-        target: 'https://insurai-backend.shareindiainsurance.com',
+      "/health": {
+        target: "https://insurai-backend.shareindiainsurance.com",
         changeOrigin: true,
       },
     },
