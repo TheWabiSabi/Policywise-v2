@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { auth } from '../authClient';
 import { toast } from 'react-hot-toast';
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, Zap, FileSearch, KeyRound } from 'lucide-react';
@@ -31,6 +31,15 @@ function SubmitButton({ loading, label, loadingLabel, disabled }) {
     );
 }
 
+function getGoogleErrorMessage(err) {
+    const msg = err?.message || '';
+    const lower = msg.toLowerCase();
+    if (lower.includes('incorrect username or password') || lower.includes('cognito authentication failed')) {
+        return 'Google sign-in could not complete for this email. If you already have an account, sign in with email and password.';
+    }
+    return msg || 'Google sign in failed.';
+}
+
 // ── main component ─────────────────────────────────────────────────────────
 /**
  * view states: 'signin' | 'signup' | 'confirm' | 'forgot' | 'forgot-confirm'
@@ -38,6 +47,8 @@ function SubmitButton({ loading, label, loadingLabel, disabled }) {
 export default function Auth({ onAuthSuccess }) {
     const [view, setView] = useState('signin');
     const [loading, setLoading] = useState(false);
+    const googleButtonRef = useRef(null);
+    const [googleReady, setGoogleReady] = useState(false);
 
     // shared fields
     const [email, setEmail] = useState('');
@@ -47,7 +58,6 @@ export default function Auth({ onAuthSuccess }) {
     // signup fields
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [phone, setPhone] = useState('');
     const [emailError, setEmailError] = useState('');
 
     // confirm OTP
@@ -66,6 +76,39 @@ export default function Auth({ onAuthSuccess }) {
         if (!email) { setEmailError(''); return; }
         setEmailError(emailRegex.test(email.trim()) ? '' : 'Please enter a valid email address.');
     }, [email, view]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        // Initialize Google Identity Services for the NestJS /auth/google exchange.
+        auth.initializeGoogle(
+            () => {
+                toast.success('Signed in with Google.', { duration: 2000 });
+                if (onAuthSuccess) onAuthSuccess();
+                else window.location.reload();
+            },
+            (err) => toast.error(getGoogleErrorMessage(err))
+        ).then(() => {
+            if (cancelled) return;
+            setGoogleReady(true);
+            if (googleButtonRef.current && window.google?.accounts?.id) {
+                googleButtonRef.current.innerHTML = '';
+                window.google.accounts.id.renderButton(googleButtonRef.current, {
+                    theme: 'outline',
+                    size: 'large',
+                    type: 'standard',
+                    shape: 'rectangular',
+                    text: 'continue_with',
+                    logo_alignment: 'left',
+                    width: googleButtonRef.current.offsetWidth || 384,
+                });
+            }
+        }).catch((err) => {
+            console.warn('Google sign-in unavailable:', err);
+        });
+
+        return () => { cancelled = true; };
+    }, [onAuthSuccess, view]);
 
     // ── Enter-key progression ──────────────────────────────────────────────
     const handleKeyDown = (e) => {
@@ -110,6 +153,25 @@ export default function Auth({ onAuthSuccess }) {
         }
     };
 
+    const handleGoogleSignIn = async () => {
+        try {
+            // Fallback initialization path for browsers that load GSI late.
+            if (!googleReady) {
+                await auth.initializeGoogle(
+                    () => {
+                        if (onAuthSuccess) onAuthSuccess();
+                        else window.location.reload();
+                    },
+                    (err) => toast.error(getGoogleErrorMessage(err))
+                );
+                setGoogleReady(true);
+            }
+            auth.promptGoogle();
+        } catch (err) {
+            toast.error(getGoogleErrorMessage(err) || 'Google sign in is not available.');
+        }
+    };
+
     // ── SIGN UP ────────────────────────────────────────────────────────────
     const handleSignUp = async (e) => {
         e.preventDefault();
@@ -121,7 +183,6 @@ export default function Auth({ onAuthSuccess }) {
                 password,
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
-                phone: phone.trim() || undefined,
             });
             setPendingEmail(email.trim());
             toast.success('Account created! Check your email for the OTP code. 📬', { duration: 5000 });
@@ -278,6 +339,25 @@ export default function Auth({ onAuthSuccess }) {
                             </div>
 
                             <form className="space-y-5" onSubmit={handleSignIn} onKeyDown={handleKeyDown}>
+                                <div ref={googleButtonRef} className="w-full min-h-[44px]" />
+                                {!googleReady && (
+                                    <button
+                                        type="button"
+                                        onClick={handleGoogleSignIn}
+                                        disabled={loading}
+                                        className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
+                                        Continue with Google
+                                    </button>
+                                )}
+
+                                <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">or</span>
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                                     <div className="relative group">
@@ -324,6 +404,25 @@ export default function Auth({ onAuthSuccess }) {
                             </div>
 
                             <form className="space-y-5" onSubmit={handleSignUp} onKeyDown={handleKeyDown}>
+                                <div ref={googleButtonRef} className="w-full min-h-[44px]" />
+                                {!googleReady && (
+                                    <button
+                                        type="button"
+                                        onClick={handleGoogleSignIn}
+                                        disabled={loading}
+                                        className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600">G</span>
+                                        Continue with Google
+                                    </button>
+                                )}
+
+                                <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">or</span>
+                                    <div className="h-px flex-1 bg-slate-200" />
+                                </div>
+
                                 {/* First + Last name */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -354,16 +453,6 @@ export default function Auth({ onAuthSuccess }) {
                                         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className={inputCls(!!emailError)} />
                                     </div>
                                     {emailError && <p className="text-xs text-rose-600 mt-1.5 font-medium">{emailError}</p>}
-                                </div>
-
-                                {/* Phone (optional) */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone <span className="text-slate-400 font-normal">(optional)</span></label>
-                                    <input
-                                        type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                                        placeholder="+91 98765 43210"
-                                        className="appearance-none block w-full px-3 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all sm:text-sm"
-                                    />
                                 </div>
 
                                 {/* Password */}

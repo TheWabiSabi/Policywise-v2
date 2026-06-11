@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { auth, apiFetch, clearTokens } from './authClient';
+import { auth, apiFetch } from './authClient';
 import { Toaster, toast } from 'react-hot-toast';
 
 // Components
@@ -10,15 +10,97 @@ import AdminDashboard from './components/AdminDashboard';
 import Analyzer from './components/Analyzer';
 import Settings from './components/Settings';
 import UpdatePassword from './components/UpdatePassword';
-import PhoneVerificationGate from './components/PhoneVerificationGate';
 
 export default function App() {
     const [session, setSession] = useState(null);
     const [role, setRole] = useState(null);
     const [fullName, setFullName] = useState(null);
     const [username, setUsername] = useState(null);
-    const [phoneVerified, setPhoneVerified] = useState(null);
     const [loading, setLoading] = useState(true);
+    const fetchUserDataPromiseRef = useRef(null);
+
+    const applyUserData = useCallback((userData = {}) => {
+        // Auth is owned by Cognito/NestJS now; profile data is useful for UI,
+        // but missing profile fields should not block a valid login session.
+        const rawRole = String(userData.role || userData['custom:role'] || 'client').toLowerCase();
+        const userRole = rawRole === 'admin' ? 'admin' : 'client';
+        const userFullName = userData.name || userData.full_name || userData.username || userData.email || '';
+        const userUsername = userData.username || userData.email || '';
+        setRole(userRole);
+        setFullName(userFullName);
+        setUsername(userUsername);
+    }, []);
+
+    const fetchUserData = useCallback(async () => {
+        if (fetchUserDataPromiseRef.current) return fetchUserDataPromiseRef.current;
+
+        fetchUserDataPromiseRef.current = (async () => {
+            console.log("DEBUG: fetchUserData started");
+            try {
+                // Fetch the user from the Cognito auth service
+                const userData = await auth.getUser();
+                console.log("DEBUG: getUser returned", userData);
+
+                if (userData) {
+                    applyUserData(userData);
+                    return;
+                }
+
+                const { data: { session: currentSession } } = await auth.getSession();
+                if (currentSession) {
+                    console.warn("DEBUG: Profile unavailable. Continuing with authenticated session.");
+                    applyUserData(currentSession.user || {});
+                    return;
+                }
+
+                console.warn("DEBUG: No auth session found after profile lookup. Signing out.");
+                await auth.signOut();
+                setSession(null);
+                setRole(null);
+                setFullName(null);
+                setUsername(null);
+                setLoading(false);
+            } catch (err) {
+                console.error("DEBUG: Error fetching user profile data", err);
+                // Try /users/profile as fallback
+                try {
+                    const profile = await apiFetch('/users/profile');
+                    if (profile) {
+                        applyUserData(profile);
+                        return;
+                    }
+                } catch (profileErr) {
+                    console.error("DEBUG: /users/profile fallback also failed", profileErr);
+                }
+
+                const { data: { session: currentSession } } = await auth.getSession();
+                if (currentSession) {
+                    console.warn("DEBUG: Continuing with cached authenticated session after profile errors.");
+                    applyUserData(currentSession.user || {});
+                }
+            }
+        })();
+
+        try {
+            return await fetchUserDataPromiseRef.current;
+        } finally {
+            fetchUserDataPromiseRef.current = null;
+        }
+    }, [applyUserData]);
+
+    const handleAuthSuccess = useCallback(async () => {
+        setLoading(true);
+        try {
+            await fetchUserData();
+            const { data: { session: freshSession } } = await auth.getSession();
+            setSession(freshSession);
+        } catch (err) {
+            console.error("DEBUG: Error completing auth handoff", err);
+            toast.error("Signed in, but couldn't load your workspace. Please refresh once.");
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchUserData]);
 
     useEffect(() => {
         let mounted = true;
@@ -33,18 +115,10 @@ export default function App() {
                 if (!mounted) return;
 
                 if (currentSession) {
-                    // Check if they are halfway through a phone verification signup
-                    if (sessionStorage.getItem('signup_in_progress') === 'true') {
-                        console.log("DEBUG: Abandoned mid-signup detected during refresh. Cleaning up.");
-                        await auth.signOut();
-                        sessionStorage.removeItem('signup_in_progress');
-                        if (mounted) setLoading(false);
-                        return;
-                    }
-
                     await fetchUserData();
                     if (mounted) {
-                        setSession(currentSession);
+                        const { data: { session: freshSession } } = await auth.getSession();
+                        setSession(freshSession);
                         setLoading(false);
                     }
                 } else {
@@ -60,20 +134,18 @@ export default function App() {
 
         const { data: { subscription } } = auth.onAuthStateChange(async (event, sessionData) => {
             if (event === 'SIGNED_IN' && sessionData) {
-                if (sessionStorage.getItem('signup_in_progress') === 'true') {
-                    console.log("DEBUG: Signup in progress, holding router at /login.");
-                    return;
-                }
                 await fetchUserData();
                 const { data: { session: freshSession } } = await auth.getSession();
-                if (mounted) setSession(freshSession);
+                if (mounted) {
+                    setSession(freshSession);
+                    setLoading(false);
+                }
             } else if (event === 'SIGNED_OUT') {
                 if (mounted) {
                     setSession(null);
                     setRole(null);
                     setFullName(null);
                     setUsername(null);
-                    setPhoneVerified(null);
                     setLoading(false);
                 }
             }
@@ -83,54 +155,7 @@ export default function App() {
             mounted = false;
             subscription.unsubscribe();
         };
-    }, []);
-
-    const fetchUserData = async (userIdUnused) => {
-        console.log("DEBUG: fetchUserData started");
-        try {
-            // Fetch the user from the Cognito auth service
-            const userData = await auth.getUser();
-            console.log("DEBUG: getUser returned", userData);
-
-            if (userData) {
-                // Map Cognito user fields to the existing role/profile structure.
-                // Cognito doesn't have roles by default — use custom attribute or default to 'client'.
-                const userRole = userData.role || userData['custom:role'] || 'client';
-                const userFullName = userData.name || userData.full_name || userData.username || userData.email || '';
-                const userUsername = userData.username || userData.email || '';
-                const userPhone = userData.phone || userData.phone_number || null;
-
-                setRole(userRole);
-                setFullName(userFullName);
-                setUsername(userUsername);
-                setPhoneVerified(!!userPhone);
-            } else {
-                console.warn("DEBUG: No user data returned. Signing out.");
-                toast.error("Could not load user profile. Please sign in again.", { duration: 6000 });
-                await auth.signOut();
-                setSession(null);
-                setRole(null);
-                setFullName(null);
-                setUsername(null);
-                setPhoneVerified(null);
-                setLoading(false);
-            }
-        } catch (err) {
-            console.error("DEBUG: Error fetching user profile data", err);
-            // Try /users/profile as fallback
-            try {
-                const profile = await apiFetch('/users/profile');
-                if (profile) {
-                    setRole(profile.role || 'client');
-                    setFullName(profile.full_name || profile.name || '');
-                    setUsername(profile.username || '');
-                    setPhoneVerified(!!profile.phone);
-                }
-            } catch (profileErr) {
-                console.error("DEBUG: /users/profile fallback also failed", profileErr);
-            }
-        }
-    };
+    }, [fetchUserData]);
 
     // Auto-Logout if idle for 15 minutes
     useEffect(() => {
@@ -175,14 +200,13 @@ export default function App() {
         );
     }
 
-    if (session && phoneVerified === false) {
-        return (
-            <>
-                <Toaster position="top-right" />
-                <PhoneVerificationGate session={session} onVerified={(newPhone) => setPhoneVerified(true)} />
-            </>
-        );
-    }
+    const resolvingRole = session && !role;
+    const routeLoader = (
+        <div className="min-h-screen flex flex-col items-center justify-center font-sans bg-slate-50">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <div className="text-slate-500 font-bold animate-pulse text-sm uppercase tracking-widest">Opening Workspace...</div>
+        </div>
+    );
 
     return (
         <BrowserRouter>
@@ -191,7 +215,7 @@ export default function App() {
                 {/* Public / Auth Route */}
                 <Route
                     path="/login"
-                    element={!session ? <Auth onAuthSuccess={() => window.location.reload()} /> : <Navigate to={role === 'admin' ? '/admin' : '/dashboard'} replace />}
+                    element={!session ? <Auth onAuthSuccess={handleAuthSuccess} /> : resolvingRole ? routeLoader : <Navigate to={role === 'admin' ? '/admin' : '/dashboard'} replace />}
                 />
 
                 <Route
@@ -202,7 +226,7 @@ export default function App() {
                 {/* Client Routes */}
                 <Route
                     path="/dashboard"
-                    element={session && role === 'client' ? <ClientDashboard session={session} fullName={fullName} username={username} /> : <Navigate to="/login" replace />}
+                    element={!session ? <Navigate to="/login" replace /> : resolvingRole ? routeLoader : role === 'client' ? <ClientDashboard session={session} fullName={fullName} username={username} /> : <Navigate to="/admin" replace />}
                 />
 
                 <Route
@@ -218,7 +242,7 @@ export default function App() {
                 {/* Admin Routes */}
                 <Route
                     path="/admin"
-                    element={session && role === 'admin' ? <AdminDashboard session={session} fullName={fullName} /> : <Navigate to="/dashboard" replace />}
+                    element={!session ? <Navigate to="/login" replace /> : resolvingRole ? routeLoader : role === 'admin' ? <AdminDashboard session={session} fullName={fullName} /> : <Navigate to="/dashboard" replace />}
                 />
 
                 {/* Default Catch-all */}

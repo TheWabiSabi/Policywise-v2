@@ -55,11 +55,20 @@ def get_current_user(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            options={"verify_exp": True},
-            audience=COGNITO_CLIENT_ID if COGNITO_CLIENT_ID else None,
+            options={"verify_exp": True, "verify_aud": False},
         )
+        token_use = payload.get("token_use")
+        expected_client = COGNITO_CLIENT_ID
+        if expected_client:
+            if token_use == "access" and payload.get("client_id") != expected_client:
+                raise jwt.InvalidAudienceError("Invalid Cognito access token client_id")
+            if token_use == "id" and payload.get("aud") != expected_client:
+                raise jwt.InvalidAudienceError("Invalid Cognito ID token audience")
+
+        user_id = payload.get("sub")
         return {
-            "user_id": payload.get("sub"),
+            "sub": user_id,
+            "user_id": user_id,
             "email": payload.get("email"),
             "username": payload.get("cognito:username"),
         }
