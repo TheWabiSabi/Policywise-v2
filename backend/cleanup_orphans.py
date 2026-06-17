@@ -1,19 +1,30 @@
 import os
 import argparse
+from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
+
+def is_placeholder(value: str) -> bool:
+    normalized = (value or "").strip().lower()
+    return (
+        not normalized
+        or "your-" in normalized
+        or "xxxxx" in normalized
+        or normalized in {"change-me", "todo", "placeholder"}
+    )
 
 def main():
     parser = argparse.ArgumentParser(description="Cleanup orphaned PDF files in Supabase Storage.")
     parser.add_argument("--delete", action="store_true", help="Delete the found orphaned files instead of just listing them.")
     args = parser.parse_args()
 
-    load_dotenv(override=True)
+    base_dir = Path(__file__).resolve().parent
+    load_dotenv(dotenv_path=base_dir / ".env", override=False)
     url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
+    key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
 
-    if not url or not key:
-        print("Missing Supabase credentials in .env")
+    if is_placeholder(url) or is_placeholder(key):
+        print("Missing SUPABASE_URL and SUPABASE_SERVICE_KEY/SUPABASE_KEY in backend/.env")
         return
 
     client = create_client(url, key)

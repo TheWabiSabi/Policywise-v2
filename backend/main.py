@@ -9,6 +9,7 @@ import json
 import csv
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -27,12 +28,44 @@ from supabase import create_client, Client
 from pydantic import BaseModel, Field
 from typing import List, Dict
 
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=BASE_DIR / ".env", override=False)
+os.chdir(BASE_DIR)
+
 # ── Cognito JWT validation ────────────────────────────────────────────────────
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION = os.getenv("COGNITO_REGION") or os.getenv("AWS_REGION", "us-east-1")
 COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "")
 COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "")
 
-_JWKS_URI = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
+_COGNITO_ISSUER = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+_JWKS_URI = f"{_COGNITO_ISSUER}/.well-known/jwks.json"
+
+def _is_placeholder(value: str) -> bool:
+    normalized = (value or "").strip().lower()
+    return (
+        not normalized
+        or "your-" in normalized
+        or "xxxxx" in normalized
+        or normalized in {"change-me", "todo", "placeholder"}
+    )
+
+def _require_cognito_config():
+    missing = []
+    if _is_placeholder(AWS_REGION):
+        missing.append("AWS_REGION")
+    if _is_placeholder(COGNITO_USER_POOL_ID):
+        missing.append("COGNITO_USER_POOL_ID")
+    if _is_placeholder(COGNITO_CLIENT_ID):
+        missing.append("COGNITO_CLIENT_ID")
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Backend Cognito auth is not configured. Set "
+                f"{', '.join(missing)} in backend/.env to match the auth service "
+                "that issued the login token."
+            ),
+        )
 
 @lru_cache(maxsize=1)
 def _get_jwks_client():
@@ -49,12 +82,14 @@ def get_current_user(
     token = credentials.credentials
     
     try:
+        _require_cognito_config()
         jwks_client = _get_jwks_client()
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
+            issuer=_COGNITO_ISSUER,
             options={"verify_exp": True, "verify_aud": False},
         )
         token_use = payload.get("token_use")
@@ -76,8 +111,17 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Token validation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Token validation failed while fetching Cognito signing keys. "
+                "Check AWS_REGION and COGNITO_USER_POOL_ID in backend/.env. "
+                f"JWKS URL: {_JWKS_URI}. Error: {str(e)}"
+            ),
+        )
 
 class ComponentSchema(BaseModel):
     label: str
@@ -117,17 +161,19 @@ class Pass2Schema(BaseModel):
     features: List[FeatureEvaluation]
     comprehensive_findings: str
 
-load_dotenv(override=True)
-
-
 api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
+if _is_placeholder(api_key):
+    print(
+        f"ERROR: GEMINI_API_KEY is not set. Add a real value to {BASE_DIR / '.env'} "
+        "or export it before starting the backend.",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
-if not supabase_url or not supabase_key:
-    print("WARNING: SUPABASE_URL or SUPABASE_KEY is not set.")
+supabase_key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+if _is_placeholder(supabase_url) or _is_placeholder(supabase_key):
+    print("WARNING: SUPABASE_URL or SUPABASE_KEY/SUPABASE_SERVICE_KEY is not set.")
     supabase_client: Client | None = None
 else:
     supabase_client: Client = create_client(supabase_url, supabase_key)
@@ -2632,5 +2678,10 @@ async def delete_self(user: dict = Depends(get_current_user)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-    # Reload triggered for USP formatting tweak
+    reload_enabled = os.getenv("UVICORN_RELOAD", "").lower() in {"1", "true", "yes", "on"}
+    uvicorn.run(
+        "main:app",
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+        reload=reload_enabled,
+    )
