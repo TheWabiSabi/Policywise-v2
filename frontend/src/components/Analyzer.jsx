@@ -300,6 +300,24 @@ const hasSeniorCitizen = (policy) => {
   });
 };
 
+const hasExtractedPolicyData = (policy) => {
+  if (!policy) return false;
+  return Boolean(
+    policy.company ||
+    policy.plan ||
+    policy.premium ||
+    policy.coverage ||
+    policy.city ||
+    policy.pincode ||
+    policy.policy_details?.start_date ||
+    policy.sum_insured?.total ||
+    policy.sum_insured?.components?.length ||
+    policy.policy_holders?.length ||
+    Object.keys(policy.features_found || {}).length ||
+    Object.keys(policy.waiting_period_status || {}).length
+  );
+};
+
 // --- ANALYSIS STAGE CONFIG ---
 const ANALYSIS_STAGES = [
   {
@@ -393,6 +411,7 @@ export default function Analyzer({ session, fullName }) {
   const fileRef = useRef();
   const extractedDetailsRef = useRef(null);
   const reportSectionRef = useRef(null);
+  const hasExtractedPolicy = hasExtractedPolicyData(policy);
 
   // Handle loading existing historic analysis from Supabase
   useEffect(() => {
@@ -521,10 +540,10 @@ export default function Analyzer({ session, fullName }) {
 
   // Auto-scroll logic
   useEffect(() => {
-    if (policy.company && extractedDetailsRef.current && !analysisId) {
+    if (hasExtractedPolicy && extractedDetailsRef.current && !analysisId) {
       setTimeout(() => extractedDetailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
     }
-  }, [policy, analysisId]);
+  }, [hasExtractedPolicy, analysisId]);
 
   useEffect(() => {
     if (report && reportSectionRef.current && !analysisId) {
@@ -848,7 +867,7 @@ export default function Analyzer({ session, fullName }) {
         </div>
 
         {/* 2. Upload Box - Only show if not loading historic */}
-        {!analysisId && (
+        {!analysisId && (!hasExtractedPolicy || loading.extracting) && (
           <div className="bg-white rounded-3xl p-10 shadow-xl border border-slate-100 max-w-3xl mx-auto print:hidden transition-all hover:shadow-2xl">
 
             <div className="text-center mb-8">
@@ -876,7 +895,7 @@ export default function Analyzer({ session, fullName }) {
         )}
 
         {/* 3. Extracted Data Display (Visible in Print) */}
-        {policy.company && (
+        {hasExtractedPolicy && (
           <div id="extracted-policy-card" ref={extractedDetailsRef} className="relative bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 max-w-3xl mx-auto mt-6 overflow-hidden break-inside-avoid print:shadow-none print:border-none">
             {/* Decorative top accent */}
 
@@ -996,7 +1015,7 @@ export default function Analyzer({ session, fullName }) {
                 )}
                 <button
                   onClick={handleCompare}
-                  disabled={!policy.company || loading.comparing || (hasSeniorCitizen(policy) && policy.has_medical_history === undefined)}
+                  disabled={!hasExtractedPolicy || loading.comparing || (hasSeniorCitizen(policy) && policy.has_medical_history === undefined)}
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-bold uppercase text-sm tracking-widest hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-indigo-200 transition transform hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {loading.comparing
