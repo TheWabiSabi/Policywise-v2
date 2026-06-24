@@ -1626,7 +1626,11 @@ async def _compare_policy_core(data: dict, user: dict):
         - **Blacklist**: DO NOT recommend **Niva Bupa, Care Health, Star Health** (User Blocked).
         - **Allowed**: HDFC Ergo, ManipalCigna, Aditya Birla, SBI General, Bajaj Allianz, ICICI Lombard, Tata AIG, Future Generali.
         - **CRITICAL RULE**: Do NOT recommend the EXACT SAME plan the user currently has! The goal is to recommend an UPGRADE or a BETTER ALTERNATIVE. Recommending their current plan '{data.get('plan', 'Unknown')}' by '{data.get('company', 'Unknown')}' is STRICTLY FORBIDDEN.
-        **G. FEATURE CONSOLIDATION & WEIGHTED SCORING (CRITICAL)**:
+        **G. LOCATION ANALYSIS (CRITICAL)**:
+        - For the `location_analysis` -> `major_illnesses` array, you MUST provide EXACTLY 6 illnesses: Cancer, Bypass, Kidney failure, Angioplasty, Liver transplant, and Stroke.
+        - Estimate their treatment costs at PREMIUM hospitals in {data.get('city', 'Unknown')} based on current rates. Do NOT omit any of the 6 illnesses.
+
+        **H. FEATURE CONSOLIDATION & WEIGHTED SCORING (CRITICAL)**:
         1. **Consolidation**: Different companies use different terms (e.g., "Claim Protector", "Safe Guard", "Safe Guard +"). You MUST consolidate these overlapping terms under the single standard `Feature` name found in "Ref 1 CSV DATA" (e.g., "Claim Protector" or "Safe Guard"). Do NOT output both if they mean the same thing. Show only 1 unified row for that benefit.
         2. **Weighted Scoring (0.0 to 1.0)**: You MUST assign a `score_weight` to EVERY feature evaluated.
             - `1.0`: Best possible option/highest limit (e.g., No Room Rent Capping, Pre & Post 60/180 days).
@@ -1649,12 +1653,14 @@ async def _compare_policy_core(data: dict, user: dict):
                 "tier": "{user_profile['city_tier']}",
                 "insight": "Healthcare costs in {data.get('city', 'your city')} are [High/Moderate/Low]... (Mention specific costs)",
                 "major_illnesses": [
-                    {{ "illness": "Most common disease in {data.get('city', 'this city')}", "estimated_cost": "₹[Local Rate]" }},
-                    {{ "illness": "Another common disease in {data.get('city', 'this city')}", "estimated_cost": "₹[Local Rate]" }}
-                    // CRITICAL: Provide EXACTLY 4 to 6 of the most realistically COMMON/FREQUENT diseases in {data.get('city', 'Unknown')}
-                    // DO NOT copy placeholders. Estimate their treatment costs at PREMIUM hospitals in THIS SPECIFIC CITY.
+                    {{ "illness": "Cancer", "estimated_cost": "₹[Local Rate]" }},
+                    {{ "illness": "Bypass", "estimated_cost": "₹[Local Rate]" }},
+                    {{ "illness": "Kidney failure", "estimated_cost": "₹[Local Rate]" }},
+                    {{ "illness": "Angioplasty", "estimated_cost": "₹[Local Rate]" }},
+                    {{ "illness": "Liver transplant", "estimated_cost": "₹[Local Rate]" }},
+                    {{ "illness": "Stroke", "estimated_cost": "₹[Local Rate]" }}
                 ],
-                "verdict": "Your Sum Insured of {data.get('sum_insured', {}).get('total', '...')} is [Adequate/Insufficient] because..."
+                "verdict": "Your Sum Insured of {data.get('sum_insured', {{}}).get('total', '...')} is [Adequate/Insufficient] because..."
             }},
             "feature_analysis_dict": {{
                 "Infinite Care": {{
@@ -1879,11 +1885,11 @@ async def _compare_policy_core(data: dict, user: dict):
              - Also check "Red Flags" present in the existing policy.
            - **Format**: Return simple string arrays.
         12. **LOCAL HEALTH INSIGHT (CRITICAL)**:
-           - You MUST tailor the `major_illnesses` array precisely to the user's specific city: `{data.get('city', 'Unknown')}`.
-           - Output EXACTLY 4 to 6 of the most famous, common, and frequent diseases specific to that city (e.g. Dengue/Malaria in tropical areas, Respiratory issues in highly polluted metros).
-           - Do not just pick the most expensive surgeries. Pick the illnesses people in that area actually get hospitalized for most often.
-           - Use the web search tool (or your internal knowledge of 2025 Indian healthcare) to fetch realistic hospitalization costs for treating those specific common diseases at **premium, top-tier private hospitals** in that exact city.
-           - Do NOT simply reuse generic examples. Vary the illnesses to match the local region and precisely adjust the `estimated_cost` to reflect the local market rate.
+           - You MUST precisely provide cost estimates for the user's specific city: `{data.get('city', 'Unknown')}`.
+           - Output EXACTLY these 6 illnesses: Cancer, Bypass, Kidney failure, Angioplasty, Liver transplant, Stroke. Do not include any others.
+           - Use your internal knowledge to fetch realistic hospitalization costs for treating those specific 6 illnesses at **premium, top-tier private hospitals** in that exact city.
+           - Precisely adjust the `estimated_cost` to reflect the local market rate for each of these 6 illnesses based on the city.
+           - Ensure the estimated costs are realistic for {data.get('city', 'Unknown')}.
         """
 
         try:
