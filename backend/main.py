@@ -1660,7 +1660,7 @@ async def _compare_policy_core(data: dict, user: dict):
                     {{ "illness": "Liver transplant", "estimated_cost": "₹[Local Rate]" }},
                     {{ "illness": "Stroke", "estimated_cost": "₹[Local Rate]" }}
                 ],
-                "verdict": "Your Sum Insured of {data.get('sum_insured', {{}}).get('total', '...')} is [Adequate/Insufficient] because..."
+                "verdict": "Your Sum Insured of {data.get('sum_insured', dict()).get('total', '...')} is [Adequate/Insufficient] because..."
             }},
             "feature_analysis_dict": {{
                 "Infinite Care": {{
