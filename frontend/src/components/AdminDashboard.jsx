@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { auth } from '../authClient';
+import { auth, apiFetch } from '../authClient';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal';
-
-import { API_BASE } from '../config';
 
 export default function AdminDashboard({ session, fullName }) {
     const [analyses, setAnalyses] = useState([]);
@@ -29,18 +26,11 @@ export default function AdminDashboard({ session, fullName }) {
     const fetchAnalyses = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('policy_analyses')
-                .select(`
-                    *,
-                    profiles(email, full_name, phone)
-                `)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const data = await apiFetch('/admin/analyses');
             setAnalyses(data || []);
         } catch (error) {
             console.error('Error fetching admin data:', error.message);
+            toast.error("Couldn't load admin history.");
         } finally {
             setLoading(false);
         }
@@ -73,23 +63,7 @@ export default function AdminDashboard({ session, fullName }) {
         // Fire-and-forget API call in background
         (async () => {
             try {
-                const { data: { session: freshSession } } = await auth.getSession();
-                const token = freshSession?.access_token;
-
-                const res = await fetch(`${API_BASE}/analysis/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    let detail = "Delete failed";
-                    try {
-                        const json = JSON.parse(errorText);
-                        if (json.detail) detail = json.detail;
-                    } catch { detail = errorText || detail; }
-                    throw new Error(detail);
-                }
+                await apiFetch(`/analysis/${id}`, { method: 'DELETE' });
             } catch (error) {
                 console.error('Error deleting policy:', error.message);
                 // Roll back the optimistic removal
