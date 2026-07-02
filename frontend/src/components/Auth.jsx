@@ -53,6 +53,7 @@ export default function Auth({ onAuthSuccess }) {
     // shared fields
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
     // signup fields
@@ -127,6 +128,7 @@ export default function Auth({ onAuthSuccess }) {
     // reset when switching views
     const switchView = (next) => {
         setPassword('');
+        setConfirmPassword('');
         setShowPassword(false);
         setEmailError('');
         setView(next);
@@ -176,6 +178,8 @@ export default function Auth({ onAuthSuccess }) {
     const handleSignUp = async (e) => {
         e.preventDefault();
         if (emailError) { toast.error('Please fix the email error first.'); return; }
+        if (password.length < 8) { toast.error('Password must be at least 8 characters.'); return; }
+        if (password !== confirmPassword) { toast.error('Passwords do not match.'); return; }
         setLoading(true);
         try {
             await auth.signUp({
@@ -471,10 +475,26 @@ export default function Auth({ onAuthSuccess }) {
                                     </div>
                                 </div>
 
+                                {/* Confirm Password */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
+                                    <div className="relative group">
+                                        <InputIcon icon={Lock} />
+                                        <input
+                                            type={showPassword ? 'text' : 'password'} required value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter password"
+                                            className={inputCls(confirmPassword && password !== confirmPassword)}
+                                        />
+                                    </div>
+                                    {confirmPassword && password !== confirmPassword && (
+                                        <p className="text-xs text-rose-600 mt-1.5 font-medium">Passwords do not match.</p>
+                                    )}
+                                </div>
+
                                 <div className="pt-2">
                                     <SubmitButton
                                         loading={loading} label="Create Account" loadingLabel="Creating Account..."
-                                        disabled={!email.trim() || !!emailError || !firstName.trim() || !lastName.trim() || password.length < 8}
+                                        disabled={!email.trim() || !!emailError || !firstName.trim() || !lastName.trim() || password.length < 8 || password !== confirmPassword}
                                     />
                                 </div>
                             </form>

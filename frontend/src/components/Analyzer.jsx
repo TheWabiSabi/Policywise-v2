@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { supabase } from '../supabaseClient';
-import { auth } from '../authClient';
+import { auth, apiFetch } from '../authClient';
 import { toast } from 'react-hot-toast';
 
 // --- THE API BRIDGE ---
@@ -423,43 +422,18 @@ export default function Analyzer({ session, fullName }) {
   const loadHistoricAnalysis = async (id) => {
     try {
       setLoading({ extracting: true, comparing: true });
-      const { data, error } = await supabase
-        .from('policy_analyses')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const data = await apiFetch(`/analysis/${id}`);
 
-      if (error) throw error;
       if (data) {
         setPolicy(data.extracted_data);
         setReport(data.report_data);
 
         // [PHASE 21] If the logged-in user is NOT the owner of the analysis, enforce Read-Only mode
-        // Note: New analyses won't have data.user_id yet locally, so they are not read-only
-        if (data.user_id && session?.user?.id && data.user_id !== session.user.id) {
-          setIsReadOnly(true);
-        } else {
-          setIsReadOnly(false);
-        }
+        setIsReadOnly(Boolean(data.is_read_only));
 
         // [NEW] Load ALL chats for this analysis (allowing multiple sidebar entries)
-        // [FIX] Shifted from supabase-js to backend API to bypass RLS for Admins viewing User chats
         try {
-          // Since callBackend defaults to POST and we only have a GET endpoint, 
-          // let's fetch it manually with auth token or adjust callBackend params.
-          const { data: { session: freshSession } } = await auth.getSession();
-          const token = freshSession?.access_token;
-
-          const chatRes = await fetch(`${API_BASE}/chats/${id}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
-
-          if (!chatRes.ok) throw new Error("Failed to fetch chats");
-          const chatListData = await chatRes.json();
+          const chatListData = await apiFetch(`/chats/${id}`);
 
           if (chatListData && chatListData.length > 0) {
             // The most recent chat becomes the 'Main' view
@@ -501,14 +475,8 @@ export default function Analyzer({ session, fullName }) {
       if (!session?.user?.id) return;
 
       try {
-        const { data: standaloneData, error: standaloneErr } = await supabase
-          .from('chats')
-          .select('id, title, chat_history')
-          .is('analysis_id', null)
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false });
-
-        if (!standaloneErr && standaloneData) {
+        const standaloneData = await apiFetch('/chats');
+        if (standaloneData) {
           const formattedChats = standaloneData.map(c => ({
             id: c.id,
             db_id: c.id,
@@ -703,25 +671,14 @@ export default function Analyzer({ session, fullName }) {
     e.stopPropagation();
 
     const chatToDelete = savedChats.find(c => c.id === chatId);
+    const dbChatId = chatToDelete?.db_id || (typeof chatId === 'string' && chatId !== 'historic' ? chatId : null);
 
-    // If deleting the saved historic chat, wipe it from the database completely
-    if (chatId === 'historic' && (analysisId || report?.db_analysis_id)) {
+    if (dbChatId) {
       try {
-        await supabase
-          .from('chats')
-          .delete()
-          .eq('analysis_id', analysisId || report?.db_analysis_id);
+        await apiFetch(`/chat-threads/${dbChatId}`, { method: 'DELETE' });
       } catch (err) {
-        console.error("Failed to delete historic chat:", err);
-      }
-    } else if (typeof chatId === 'string' && chatId !== 'historic') { // If deleting a standalone chat
-      try {
-        await supabase
-          .from('chats')
-          .delete()
-          .eq('id', chatId);
-      } catch (err) {
-        console.error("Failed to delete standalone chat:", err);
+        console.error("Failed to delete chat:", err);
+        toast.error("Failed to delete chat.");
       }
     }
 
@@ -746,15 +703,16 @@ export default function Analyzer({ session, fullName }) {
 
     const safeTitle = editTitleValue.trim().substring(0, 50);
 
-    // 1. Update DB if it is the historic persistent chat
-    if (chatId === 'historic' && (analysisId || report?.db_analysis_id)) {
-      try {
-        const { error } = await supabase
-          .from('chats')
-          .update({ title: safeTitle })
-          .eq('analysis_id', analysisId || report?.db_analysis_id);
+    const chatToUpdate = savedChats.find(c => c.id === chatId);
+    const dbChatId = chatToUpdate?.db_id || (typeof chatId === 'string' && chatId !== 'historic' ? chatId : null);
 
-        if (error) throw error;
+    // 1. Update DB if this chat has been persisted
+    if (dbChatId) {
+      try {
+        await apiFetch(`/chat-threads/${dbChatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ title: safeTitle })
+        });
       } catch (err) {
         console.error("Failed to update chat title in DB", err);
         // Fallthrough to update UI anyway for responsiveness

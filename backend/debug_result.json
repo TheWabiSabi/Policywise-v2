@@ -1,213 +1,198 @@
 {
   "family_analysis": {
     "status": "Individual",
-    "insight": "Your current policy is a Comprehensive Property & Liability Insurance, not a health insurance plan. Therefore, it does not cover any health-related expenses. As an individual, your health insurance needs should prioritize comprehensive coverage for personal medical emergencies, wellness benefits, and features that lock in your premium at a young age.",
+    "insight": "Based on your policy covering an individual, we prioritized plans focusing on personal usage, wellness benefits, and age-locked premiums to ensure long-term affordability and comprehensive coverage tailored to a young adult's needs.",
     "key_priorities": [
       "Low Premium",
-      "Wellness Benefits",
-      "Lock-in Age for Premiums"
+      "Wellness Programs",
+      "Age Lock-in Feature"
     ]
   },
   "location_analysis": {
     "city": "Sample City",
     "tier": "Tier 2/3",
-    "insight": "Healthcare costs in Sample City, a Tier 2/3 city, are moderate but steadily rising. While not as high as metros, quality private hospital care can still be expensive. A Sum Insured of \u20b910L-\u20b925L is recommended to adequately cover potential medical expenses and protect against inflation.",
+    "insight": "Healthcare costs in Sample City are moderate, but specialized treatments can still be expensive. A Sum Insured of \u20b910L-\u20b925L is recommended to adequately cover potential medical emergencies and critical illnesses.",
     "major_illnesses": [
       {
-        "illness": "Dengue Fever (Severe)",
-        "estimated_cost": "\u20b980,000 - \u20b91,50,000"
+        "illness": "Cancer",
+        "estimated_cost": "\u20b98,00,000 - \u20b915,00,000"
       },
       {
-        "illness": "Appendicitis Surgery",
-        "estimated_cost": "\u20b91,20,000 - \u20b92,50,000"
+        "illness": "Bypass",
+        "estimated_cost": "\u20b95,00,000 - \u20b910,00,000"
       },
       {
-        "illness": "Typhoid Fever (Complicated)",
-        "estimated_cost": "\u20b970,000 - \u20b91,30,000"
+        "illness": "Kidney failure",
+        "estimated_cost": "\u20b96,00,000 - \u20b912,00,000"
       },
       {
-        "illness": "Road Traffic Accident (Moderate Injury)",
-        "estimated_cost": "\u20b92,00,000 - \u20b94,00,000"
+        "illness": "Angioplasty",
+        "estimated_cost": "\u20b93,00,000 - \u20b96,00,000"
       },
       {
-        "illness": "Pneumonia (Severe)",
-        "estimated_cost": "\u20b990,000 - \u20b91,80,000"
+        "illness": "Liver transplant",
+        "estimated_cost": "\u20b920,00,000 - \u20b935,00,000"
+      },
+      {
+        "illness": "Stroke",
+        "estimated_cost": "\u20b94,00,000 - \u20b98,00,000"
       }
     ],
-    "verdict": "Your current Sum Insured of 5,00,000 is insufficient for health insurance, as your existing policy is for property and liability. For health coverage in Sample City, a Sum Insured of \u20b910L-\u20b925L is recommended to ensure adequate financial protection against rising medical costs."
+    "verdict": "Your current Sum Insured of 5,00,000 is insufficient because it falls below the recommended range of \u20b910L \u2013 \u20b925L for a Tier 2/3 city like Sample City, especially considering the estimated costs for major illnesses. An upgrade is crucial to ensure adequate financial protection."
   },
   "feature_analysis_dict": {
     "Infinite Care": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
-      "status": "Negative",
-      "value": "Not Covered",
-      "score_weight": 0.0
-    },
-    "No Sub-limits": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "Consumables & Non-Payable Cover": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "Inflation Protector": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "No Claim Bonus": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "Restoration Benefit": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "In Patient Hospitalization": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "Pre & Post Hospitalization": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "Room Rent": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "ICU Charges": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "Day Care Treatments": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
-    "Coverage of Pre-Existing Diseases": {
-      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
-      "status": "Positive",
-      "value": "Standard Cover",
-      "score_weight": 0.75
-    },
     "Domiciliary Treatment": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "AYUSH Treatment": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "Ambulance Cover": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "Donor Expenses": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
       "status": "Negative",
-      "value": "Not Covered",
+      "value": "Not Covered by this policy",
       "score_weight": 0.0
     },
     "Health Check-up": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "Air Ambulance": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
-      "status": "Negative",
-      "value": "Not Covered",
-      "score_weight": 0.0
-    },
-    "Second Opinion": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
-      "status": "Negative",
-      "value": "Not Covered",
-      "score_weight": 0.0
-    },
-    "Claim Protector": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
-      "status": "Negative",
-      "value": "Not Covered",
-      "score_weight": 0.0
-    },
-    "Modern Treatment": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
-      "status": "Negative",
-      "value": "Not Covered",
-      "score_weight": 0.0
-    },
-    "Secure Benefit": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "Bariatric Surgery": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
     "Specific Illness Waiting Period": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
+      "status": "Negative",
+      "value": "Not Covered by this policy",
+      "score_weight": 0.0
+    },
+    "Initial waiting period": {
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
+      "status": "Negative",
+      "value": "Not Covered by this policy",
+      "score_weight": 0.0
+    },
+    "Coverage of Pre-Existing Diseases": {
+      "policy_text": "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies.",
+      "status": "Negative",
+      "value": "Not Covered by this policy",
+      "score_weight": 0.0
+    },
+    "No Sub-limits": {
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     },
-    "Automatic Restoration": {
-      "policy_text": "The document is a Comprehensive General Insurance Policy for Property & Liability and does not contain any health insurance related features.",
+    "Modern Treatment": {
+      "policy_text": "Not mentioned in the policy document.",
+      "status": "Negative",
+      "value": "Not Covered",
+      "score_weight": 0.0
+    },
+    "Claim Protector": {
+      "policy_text": "Not mentioned in the policy document.",
+      "status": "Negative",
+      "value": "Not Covered",
+      "score_weight": 0.0
+    },
+    "Second Opinion for Critical Illness": {
+      "policy_text": "Not mentioned in the policy document.",
+      "status": "Negative",
+      "value": "Not Covered",
+      "score_weight": 0.0
+    },
+    "Surplus/Secure Benefit": {
+      "policy_text": "Not mentioned in the policy document.",
       "status": "Negative",
       "value": "Not Covered",
       "score_weight": 0.0
     }
   },
-  "additional_discovered_features": [
-    {
-      "name": "Property Damage Cover",
-      "category": "Special Features",
-      "explanation": "Covers physical loss or damage to insured property.",
-      "policy_text": "The coverage is for physical loss or damage to property and third-party liability.",
-      "status": "Positive",
-      "value": "Covered up to 5,00,000",
-      "score_weight": 1.0
-    },
-    {
-      "name": "Third-Party Liability Cover",
-      "category": "Special Features",
-      "explanation": "Covers legal liability for bodily injury or property damage to third parties.",
-      "policy_text": "The coverage is for physical loss or damage to property and third-party liability.",
-      "status": "Positive",
-      "value": "Covered",
-      "score_weight": 1.0
-    }
-  ],
+  "additional_discovered_features": [],
   "product_score": 0.0,
   "current_policy_stats": {
     "company": "ABC General Insurance Company Ltd.",
@@ -220,24 +205,22 @@
   },
   "recommendations": [
     {
-      "category": "Top Pick: Comprehensive Individual Health Plan (Wellness & Age Lock)",
+      "category": "Upgrade: Comprehensive Individual Health Plan (Enhanced Wellness & Returns)",
       "items": [
         {
           "company": "Aditya Birla",
           "name": "Activ Health Platinum (Enhanced)",
           "type": "Individual Health Insurance",
-          "positive_features_count": 25,
-          "premium": "\u20b915,000 - \u20b920,000",
-          "description": "USP: Earn 100% HealthReturns\u2122 (full premium back) for staying healthy. This plan is ideal for young adults, offering Day 1 cover for 7 chronic conditions and an automatic upgrade to a Chronic Program if a condition develops later, promoting long-term wellness and financial benefits.",
+          "positive_features_count": 15,
+          "premium": "\u20b918,000 - \u20b925,000",
+          "description": "USP: 100% HealthReturns\u2122 (Earn full premium back); Day 1 cover for 7 chronic conditions; Automatic upgrade to Chronic Program if condition develops later. This plan is ideal for a young adult prioritizing wellness and long-term value, offering significant returns on premium and early coverage for chronic conditions.",
           "stats": {
             "csr": "94.52%",
-            "csr_rank": "1",
             "solvency": "1.67",
-            "complaints": "99.98%",
-            "complaints_rank": "2"
+            "complaints": "99.98%"
           },
           "benefits": [
-            "100% HealthReturns\u2122 (premium back)",
+            "100% HealthReturns\u2122 (Earn full premium back)",
             "Day 1 cover for 7 chronic conditions",
             "Automatic upgrade to Chronic Program",
             "Unlimited Super Reload for same/unrelated illnesses"
@@ -252,7 +235,7 @@
             {
               "feature": "Consumables & Non-Payable Cover",
               "existing": "Not Covered",
-              "proposed": "Included (Claim Protect for 100% non-medical expenses)",
+              "proposed": "Claim Protect for 100% non-medical expenses",
               "status": "Upgrade"
             },
             {
@@ -263,13 +246,13 @@
             },
             {
               "feature": "No Claim Bonus",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "100% Super Credit irrespective of claims (6x SI growth)",
               "status": "Upgrade"
             },
             {
               "feature": "Restoration Benefit",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Unlimited Super Reload for same/unrelated illnesses",
               "status": "Upgrade"
             }
@@ -277,82 +260,106 @@
           "must_have": [
             {
               "feature": "In Patient Hospitalization",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "Pre & Post Hospitalization",
-              "existing": "Not Covered",
-              "proposed": "60 Days / 180 Days",
+              "existing": "Not Covered by this policy",
+              "proposed": "Covered",
               "status": "Upgrade"
             },
             {
               "feature": "Room Rent",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Any Room upgrade (Suite/Deluxe)",
               "status": "Upgrade"
             },
             {
               "feature": "ICU Charges",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "Covered",
               "status": "Upgrade"
             },
             {
               "feature": "Day Care Treatments",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "All Procedures Covered",
               "status": "Upgrade"
             },
             {
+              "feature": "Specific Illness Waiting Period",
+              "existing": "Not Covered by this policy",
+              "proposed": "24 Months",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Initial waiting period",
+              "existing": "Not Covered by this policy",
+              "proposed": "30 Days",
+              "status": "Upgrade"
+            },
+            {
               "feature": "Coverage of Pre-Existing Diseases",
-              "existing": "Standard Cover",
-              "proposed": "Day 1 cover for 7 chronic conditions",
+              "existing": "Not Covered by this policy",
+              "proposed": "36 Months (Day 1 cover for 7 chronic conditions)",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "No Sub-limits",
+              "existing": "Not Covered",
+              "proposed": "Yes (Any Room upgrade)",
               "status": "Upgrade"
             }
           ],
           "good_to_have": [
             {
               "feature": "Domiciliary Treatment",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "Covered up to SI",
               "status": "Upgrade"
             },
             {
               "feature": "AYUSH Treatment",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "Covered up to SI",
               "status": "Upgrade"
             },
             {
               "feature": "Ambulance Cover",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "Covered up to SI",
               "status": "Upgrade"
             },
             {
               "feature": "Donor Expenses",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "Covered up to SI",
               "status": "Upgrade"
             },
             {
               "feature": "Health Check-up",
               "existing": "Not Covered",
-              "proposed": "Annual Health Assessment",
+              "proposed": "Annual Health Check-up",
               "status": "Upgrade"
             },
             {
               "feature": "Air Ambulance",
               "existing": "Not Covered",
-              "proposed": "Available (Add-on)",
+              "proposed": "Available up to SI",
               "status": "Upgrade"
             },
             {
               "feature": "Bariatric Surgery",
               "existing": "Not Covered",
               "proposed": "Available",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Second Opinion for Critical Illness",
+              "existing": "Not Covered",
+              "proposed": "Included",
               "status": "Upgrade"
             }
           ],
@@ -362,6 +369,18 @@
               "existing": "Not Covered",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
+            },
+            {
+              "feature": "Claim Protector",
+              "existing": "Not Covered",
+              "proposed": "Claim Protect for 100% non-medical expenses",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Surplus/Secure Benefit",
+              "existing": "Not Covered",
+              "proposed": "Super Credit increase even after a claim",
+              "status": "Upgrade"
             }
           ],
           "red_flags": []
@@ -369,27 +388,25 @@
       ]
     },
     {
-      "category": "Strong Alternative: Feature-Rich Individual Plan (High Coverage)",
+      "category": "Upgrade: Value-driven Individual Health Plan (High Coverage & Consumables)",
       "items": [
         {
           "company": "HDFC Ergo",
           "name": "Optima Secure",
           "type": "Individual Health Insurance",
-          "positive_features_count": 24,
-          "premium": "\u20b918,000 - \u20b923,000",
-          "description": "USP: Offers 4X Coverage from day one with Secure (2X SI from Day 1), Plus (100% after 2 yrs), Restore (100% auto-restore), and Protect (100% non-medical consumables). This plan provides robust coverage and peace of mind for a young adult seeking comprehensive protection.",
+          "positive_features_count": 15,
+          "premium": "\u20b915,000 - \u20b922,000",
+          "description": "USP: 4X Coverage; Secure (2X SI from Day 1); Plus (100% after 2 yrs); Restore (100% auto-restore); Protect (100% non-medical consumables). This plan offers exceptional value by effectively doubling your Sum Insured from day one and covering non-medical consumables, making it highly attractive for a young adult seeking robust coverage at a competitive premium.",
           "stats": {
             "csr": "86.90%",
-            "csr_rank": "8",
             "solvency": "1.68",
-            "complaints": "92.98%",
-            "complaints_rank": "11"
+            "complaints": "92.98%"
           },
           "benefits": [
-            "4X Coverage from Day 1",
+            "Secure Benefit (2X Sum Insured from Day 1)",
+            "Protect Benefit (100% non-medical consumables)",
             "Unlimited Restoration (Related and Unrelated)",
-            "100% No Claim Bonus (after year 2)",
-            "Protect Benefit (100% non-medical consumables)"
+            "No Capping on Room Rent (All Rooms)"
           ],
           "non_negotiable": [
             {
@@ -412,77 +429,95 @@
             },
             {
               "feature": "No Claim Bonus",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "100% (after year 2)",
               "status": "Upgrade"
             },
             {
               "feature": "Restoration Benefit",
-              "existing": "Not Covered",
-              "proposed": "Unlimited (Related and Unrelated)",
+              "existing": "Not Covered by this policy",
+              "proposed": "Unlimited Restoration",
               "status": "Upgrade"
             }
           ],
           "must_have": [
             {
               "feature": "In Patient Hospitalization",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "Pre & Post Hospitalization",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "60 Days / 180 Days",
               "status": "Upgrade"
             },
             {
               "feature": "Room Rent",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "No Capping (All Rooms)",
               "status": "Upgrade"
             },
             {
               "feature": "ICU Charges",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Actual ICU charges covered",
               "status": "Upgrade"
             },
             {
               "feature": "Day Care Treatments",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "All day care included",
               "status": "Upgrade"
             },
             {
+              "feature": "Specific Illness Waiting Period",
+              "existing": "Not Covered by this policy",
+              "proposed": "24 Months",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Initial waiting period",
+              "existing": "Not Covered by this policy",
+              "proposed": "30 Days",
+              "status": "Upgrade"
+            },
+            {
               "feature": "Coverage of Pre-Existing Diseases",
-              "existing": "Standard Cover",
+              "existing": "Not Covered by this policy",
               "proposed": "36 Months",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "No Sub-limits",
+              "existing": "Not Covered",
+              "proposed": "Yes (Any room)",
               "status": "Upgrade"
             }
           ],
           "good_to_have": [
             {
               "feature": "Domiciliary Treatment",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "AYUSH Treatment",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Included AYUSH Benefit",
               "status": "Upgrade"
             },
             {
               "feature": "Ambulance Cover",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Actual road costs covered",
               "status": "Upgrade"
             },
             {
               "feature": "Donor Expenses",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
@@ -503,6 +538,12 @@
               "existing": "Not Covered",
               "proposed": "Included up to SI",
               "status": "Upgrade"
+            },
+            {
+              "feature": "Second Opinion for Critical Illness",
+              "existing": "Not Covered",
+              "proposed": "Inbuilt Expert Opinion",
+              "status": "Upgrade"
             }
           ],
           "special_features": [
@@ -513,7 +554,13 @@
               "status": "Upgrade"
             },
             {
-              "feature": "Secure Benefit",
+              "feature": "Claim Protector",
+              "existing": "Not Covered",
+              "proposed": "Inbuilt Protect Benefit",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Surplus/Secure Benefit",
               "existing": "Not Covered",
               "proposed": "Secure logic (2X cover day 1)",
               "status": "Upgrade"
@@ -524,27 +571,25 @@
       ]
     },
     {
-      "category": "Value Pick: Balanced Individual Plan (Good Benefits)",
+      "category": "Upgrade: Flexible & Comprehensive Individual Health Plan (OPD & Unique Benefits)",
       "items": [
         {
-          "company": "Bajaj Allianz",
-          "name": "Health Guard- Platinum Plan",
+          "company": "ManipalCigna",
+          "name": "ProHealth Prime Protect",
           "type": "Individual Health Insurance",
-          "positive_features_count": 20,
-          "premium": "\u20b916,000 - \u20b921,000",
-          "description": "USP: Offers Super cumulative bonus (50% per year) and highest maternity limits, making it a robust choice for a young adult. This plan provides excellent benefits for future family planning while ensuring strong individual coverage.",
+          "positive_features_count": 15,
+          "premium": "\u20b917,000 - \u20b924,000",
+          "description": "USP: Daily cash for shared accommodation from Day 1; OPD expenses covered up to 50k (Advantage variant); Switch Off benefit to pause cover. This plan offers unique flexibility with its 'Switch Off' benefit and covers OPD expenses, aligning well with a young adult's need for comprehensive care and adaptable policy features.",
           "stats": {
-            "csr": "90.29%",
-            "csr_rank": "2",
-            "solvency": "3.49",
-            "complaints": "98.80%",
-            "complaints_rank": "3"
+            "csr": "88.48%",
+            "solvency": "1.66",
+            "complaints": "94.50%"
           },
           "benefits": [
-            "Super cumulative bonus (50% per year)",
-            "Recharge benefit (extra 1-4L after exhaustion)",
-            "Highest maternity limits",
-            "No room rent capping"
+            "Unlimited Restoration (Related/Unrelated)",
+            "No Capping on Room Rent (Any Room)",
+            "OPD expenses covered (Advantage variant)",
+            "Switch Off benefit to pause cover"
           ],
           "non_negotiable": [
             {
@@ -562,101 +607,125 @@
             {
               "feature": "Inflation Protector",
               "existing": "Not Covered",
-              "proposed": "Available (Add-on)",
+              "proposed": "Included (Shield)",
               "status": "Upgrade"
             },
             {
               "feature": "No Claim Bonus",
-              "existing": "Not Covered",
-              "proposed": "Super cumulative bonus (50% per year)",
+              "existing": "Not Covered by this policy",
+              "proposed": "10% increase (Max 100%)",
               "status": "Upgrade"
             },
             {
               "feature": "Restoration Benefit",
-              "existing": "Not Covered",
-              "proposed": "Recharge benefit (extra 1-4L after exhaustion)",
+              "existing": "Not Covered by this policy",
+              "proposed": "Unlimited Restoration",
               "status": "Upgrade"
             }
           ],
           "must_have": [
             {
               "feature": "In Patient Hospitalization",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "Pre & Post Hospitalization",
-              "existing": "Not Covered",
-              "proposed": "60 Days / 90 Days",
+              "existing": "Not Covered by this policy",
+              "proposed": "60 Days / 180 Days",
               "status": "Upgrade"
             },
             {
               "feature": "Room Rent",
-              "existing": "Not Covered",
-              "proposed": "No Capping",
+              "existing": "Not Covered by this policy",
+              "proposed": "Single Private AC room",
               "status": "Upgrade"
             },
             {
               "feature": "ICU Charges",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "No capping (Actuals)",
               "status": "Upgrade"
             },
             {
               "feature": "Day Care Treatments",
-              "existing": "Not Covered",
-              "proposed": "All Procedures Covered",
+              "existing": "Not Covered by this policy",
+              "proposed": "Included up to Sum Insured",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Specific Illness Waiting Period",
+              "existing": "Not Covered by this policy",
+              "proposed": "24 Months",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Initial waiting period",
+              "existing": "Not Covered by this policy",
+              "proposed": "30 Days",
               "status": "Upgrade"
             },
             {
               "feature": "Coverage of Pre-Existing Diseases",
-              "existing": "Standard Cover",
-              "proposed": "36 Months",
+              "existing": "Not Covered by this policy",
+              "proposed": "24 Months (>5L SI) / 36m (<5L SI)",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "No Sub-limits",
+              "existing": "Not Covered",
+              "proposed": "Yes (Any Room)",
               "status": "Upgrade"
             }
           ],
           "good_to_have": [
             {
               "feature": "Domiciliary Treatment",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "AYUSH Treatment",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "Ambulance Cover",
-              "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "existing": "Not Covered by this policy",
+              "proposed": "Actual road ambulance",
               "status": "Upgrade"
             },
             {
               "feature": "Donor Expenses",
-              "existing": "Not Covered",
+              "existing": "Not Covered by this policy",
               "proposed": "Covered up to Sum Insured",
               "status": "Upgrade"
             },
             {
               "feature": "Health Check-up",
               "existing": "Not Covered",
-              "proposed": "Annual Health Check-up",
+              "proposed": "Annual Adults",
               "status": "Upgrade"
             },
             {
               "feature": "Air Ambulance",
               "existing": "Not Covered",
-              "proposed": "Available (Add-on)",
+              "proposed": "10 Lakh Range domestic",
               "status": "Upgrade"
             },
             {
               "feature": "Bariatric Surgery",
               "existing": "Not Covered",
-              "proposed": "Available",
+              "proposed": "Included up to SI",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Second Opinion for Critical Illness",
+              "existing": "Not Covered",
+              "proposed": "Expert consultations",
               "status": "Upgrade"
             }
           ],
@@ -664,7 +733,19 @@
             {
               "feature": "Modern Treatment",
               "existing": "Not Covered",
-              "proposed": "Covered up to Sum Insured",
+              "proposed": "Modern treatments included",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Claim Protector",
+              "existing": "Not Covered",
+              "proposed": "Included Option",
+              "status": "Upgrade"
+            },
+            {
+              "feature": "Surplus/Secure Benefit",
+              "existing": "Not Covered",
+              "proposed": "Waiver of Premium on CI",
               "status": "Upgrade"
             }
           ],

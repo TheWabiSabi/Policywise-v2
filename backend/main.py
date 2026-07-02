@@ -36,6 +36,7 @@ os.chdir(BASE_DIR)
 AWS_REGION = os.getenv("COGNITO_REGION") or os.getenv("AWS_REGION", "us-east-1")
 COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "")
 COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "")
+AUTH_SERVICE_URL = (os.getenv("AUTH_SERVICE_URL") or os.getenv("NEXT_PUBLIC_AUTH_SERVICE_URL") or "").rstrip("/")
 
 _COGNITO_ISSUER = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
 _JWKS_URI = f"{_COGNITO_ISSUER}/.well-known/jwks.json"
@@ -101,11 +102,17 @@ def get_current_user(
                 raise jwt.InvalidAudienceError("Invalid Cognito ID token audience")
 
         user_id = payload.get("sub")
+        username = payload.get("cognito:username") or payload.get("username")
+        email = payload.get("email")
+        if not email and isinstance(username, str) and "@" in username:
+            email = username
         return {
             "sub": user_id,
             "user_id": user_id,
-            "email": payload.get("email"),
-            "username": payload.get("cognito:username"),
+            "email": email,
+            "username": username,
+            "claims": payload,
+            "token": token,
         }
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
@@ -171,12 +178,314 @@ if _is_placeholder(api_key):
     sys.exit(1)
 
 supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+supabase_key_candidates = [
+    ("SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_SERVICE_KEY")),
+    ("SUPABASE_KEY", os.getenv("SUPABASE_KEY")),
+    ("SUPABASE_PUBLISHABLE_KEY", os.getenv("SUPABASE_PUBLISHABLE_KEY")),
+    ("SUPABASE_ANON_KEY", os.getenv("SUPABASE_ANON_KEY")),
+]
+supabase_key_name, supabase_key = next(
+    ((name, value) for name, value in supabase_key_candidates if not _is_placeholder(value)),
+    (None, None),
+)
 if _is_placeholder(supabase_url) or _is_placeholder(supabase_key):
-    print("WARNING: SUPABASE_URL or SUPABASE_KEY/SUPABASE_SERVICE_KEY is not set.")
+    print(
+        "WARNING: Supabase client not initialized. Set SUPABASE_URL and one real key "
+        "(prefer SUPABASE_SERVICE_KEY for backend database/storage writes; "
+        "SUPABASE_KEY/SUPABASE_PUBLISHABLE_KEY can work only if RLS/storage policies allow it)."
+    )
     supabase_client: Client | None = None
 else:
+    if supabase_key_name != "SUPABASE_SERVICE_KEY":
+        print(
+            f"WARNING: Using {supabase_key_name} for Supabase backend writes. "
+            "If RLS is enabled, policy analysis, file upload, and chat saves may be rejected. "
+            "Use SUPABASE_SERVICE_KEY for reliable backend persistence."
+        )
     supabase_client: Client = create_client(supabase_url, supabase_key)
+
+
+def require_supabase_client() -> Client:
+    if not supabase_client:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Supabase client not initialized. Set SUPABASE_URL and SUPABASE_SERVICE_KEY "
+                "in backend/.env, then restart the backend."
+            ),
+        )
+    return supabase_client
+
+
+def _normalize_email(value: str | None) -> str:
+    email = (value or "").strip().lower()
+    return email if "@" in email else ""
+
+
+def _first_present(*values):
+    for value in values:
+        if value is not None and str(value).strip():
+            return value
+    return None
+
+
+def _profile_name_from_identity(identity: dict) -> str:
+    first_name = _first_present(identity.get("first_name"), identity.get("given_name"), identity.get("firstName"))
+    last_name = _first_present(identity.get("last_name"), identity.get("family_name"), identity.get("lastName"))
+    composed_name = " ".join(part for part in [first_name, last_name] if part).strip()
+    name = _first_present(identity.get("name"), identity.get("full_name"), composed_name)
+    email = _normalize_email(identity.get("email") or identity.get("username"))
+    username = (identity.get("username") or "").strip()
+    return str(name or (email.split("@")[0] if email else "") or username or "New User")
+
+
+def _extract_cognito_sub(identity: dict) -> str:
+    value = _first_present(
+        identity.get("sub"),
+        identity.get("userId"),
+        identity.get("user_id"),
+        identity.get("cognito_sub"),
+    )
+    return str(value or "").strip()
+
+
+def _fetch_auth_profile(token: str | None) -> dict:
+    if not token or _is_placeholder(AUTH_SERVICE_URL):
+        return {}
+
+    for endpoint in ("/auth/profile", "/users/profile"):
+        url = f"{AUTH_SERVICE_URL}{endpoint}"
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                if response.status >= 400:
+                    continue
+                payload = json.loads(response.read().decode("utf-8"))
+                return payload if isinstance(payload, dict) else {}
+        except Exception as e:
+            print(f"⚠️ Auth profile lookup failed for {endpoint}: {e}")
+    return {}
+
+
+def _build_profile_identity(user: dict) -> dict:
+    claims = user.get("claims") if isinstance(user.get("claims"), dict) else {}
+    auth_profile = _fetch_auth_profile(user.get("token"))
+
+    identity = {
+        **claims,
+        **user,
+        **auth_profile,
+    }
+
+    email = _normalize_email(
+        _first_present(
+            auth_profile.get("email"),
+            user.get("email"),
+            claims.get("email"),
+            auth_profile.get("username"),
+            user.get("username"),
+            claims.get("cognito:username"),
+            claims.get("username"),
+        )
+    )
+    username = str(
+        _first_present(
+            auth_profile.get("username"),
+            user.get("username"),
+            claims.get("cognito:username"),
+            claims.get("username"),
+            email,
+        )
+        or ""
+    ).strip()
+    cognito_sub = _extract_cognito_sub(identity)
+
+    identity["email"] = email
+    identity["username"] = username
+    identity["cognito_sub"] = cognito_sub
+    identity["full_name"] = _profile_name_from_identity(identity)
+    return identity
+
+
+def _first_profile_row(response):
+    if not response or not response.data:
+        return None
+    if isinstance(response.data, list):
+        return response.data[0] if response.data else None
+    if isinstance(response.data, dict):
+        return response.data
+    return None
+
+
+def _is_missing_cognito_sub_error(error: Exception) -> bool:
+    msg = str(error).lower()
+    return "cognito_sub" in msg and ("column" in msg or "schema cache" in msg)
+
+
+def _supabase_error_detail(error: Exception) -> str:
+    text = str(error)
+    if len(text) > 500:
+        return text[:500] + "..."
+    return text
+
+
+def _is_supabase_permission_error(error: Exception) -> bool:
+    msg = str(error).lower()
+    return any(
+        token in msg
+        for token in [
+            "row-level security",
+            "permission denied",
+            "violates row-level security",
+            "not authorized",
+            "unauthorized",
+            "42501",
+        ]
+    )
+
+
+def _select_profile(db: Client, column: str, value: str, selected: str, basic_selected: str):
+    try:
+        return _first_profile_row(
+            db.table("profiles").select(selected).eq(column, value).limit(1).execute()
+        )
+    except Exception as e:
+        if _is_missing_cognito_sub_error(e):
+            print("⚠️ profiles.cognito_sub is missing. Apply migrations/001_cognito_profiles.sql.")
+            if column == "cognito_sub":
+                return None
+            return _first_profile_row(
+                db.table("profiles").select(basic_selected).eq(column, value).limit(1).execute()
+            )
+        raise
+
+
+def resolve_profile_for_user(user: dict, create_if_missing: bool = True) -> dict:
+    """Resolve a Cognito-authenticated user to the internal profiles.id row."""
+    db = require_supabase_client()
+    identity = _build_profile_identity(user)
+    cognito_sub = identity["cognito_sub"]
+    email = identity["email"]
+    username = identity["username"] or email or cognito_sub
+
+    if not cognito_sub and not email:
+        raise HTTPException(status_code=401, detail="Authenticated user is missing identity claims")
+
+    selected = "id, email, username, full_name, phone, role, cognito_sub, created_at"
+    basic_selected = "id, email, username, full_name, phone, role, created_at"
+    profile = None
+
+    if cognito_sub:
+        try:
+            profile = _select_profile(db, "cognito_sub", cognito_sub, selected, basic_selected)
+        except Exception as e:
+            print(f"⚠️ Profile lookup by cognito_sub failed. Has the migration run? {e}")
+
+    if not profile and email:
+        try:
+            profile = _first_profile_row(
+                db.table("profiles").select(selected).ilike("email", email).limit(1).execute()
+            )
+        except Exception as e:
+            if _is_missing_cognito_sub_error(e):
+                profile = _first_profile_row(
+                    db.table("profiles").select(basic_selected).ilike("email", email).limit(1).execute()
+                )
+            else:
+                raise
+
+    if profile:
+        existing_sub = (profile.get("cognito_sub") or "").strip()
+        if cognito_sub and existing_sub and existing_sub != cognito_sub:
+            raise HTTPException(
+                status_code=409,
+                detail="This email is already linked to another Cognito account.",
+            )
+
+        updates = {}
+        if cognito_sub and "cognito_sub" in profile and not existing_sub:
+            updates["cognito_sub"] = cognito_sub
+        if email and _normalize_email(profile.get("email")) != email:
+            updates["email"] = email
+        if username and not profile.get("username"):
+            updates["username"] = username
+        if identity.get("full_name") and profile.get("full_name") in {None, "", "New User"}:
+            updates["full_name"] = identity["full_name"]
+
+        if updates:
+            try:
+                updated = db.table("profiles").update(updates).eq("id", profile["id"]).execute()
+                if updated.data:
+                    profile = {**profile, **updates}
+            except Exception as e:
+                print(f"⚠️ Failed to backfill profile identity fields: {e}")
+        return profile
+
+    if not create_if_missing:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    insert_data = {
+        "email": email or None,
+        "username": username or email or cognito_sub,
+        "full_name": identity["full_name"],
+        "role": "client",
+        "cognito_sub": cognito_sub or None,
+    }
+    try:
+        created = db.table("profiles").insert(insert_data).execute()
+    except Exception as e:
+        if _is_missing_cognito_sub_error(e):
+            print("⚠️ Creating profile without cognito_sub because migration has not been applied.")
+            insert_data.pop("cognito_sub", None)
+            try:
+                created = db.table("profiles").insert(insert_data).execute()
+            except Exception as retry_error:
+                print(f"❌ Failed to create fallback profile: {retry_error}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to create profile after migration fallback: {_supabase_error_detail(retry_error)}",
+                )
+        else:
+            print(f"❌ Failed to create Cognito-backed profile: {e}")
+            if _is_supabase_permission_error(e) or supabase_key_name != "SUPABASE_SERVICE_KEY":
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Failed to create profile because Supabase rejected the backend write. "
+                        "Set the real Supabase service_role key in SUPABASE_SERVICE_KEY and restart the backend. "
+                        f"Current key source: {supabase_key_name or 'none'}. Supabase error: {_supabase_error_detail(e)}"
+                    ),
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create profile: {_supabase_error_detail(e)}",
+            )
+
+    profile = _first_profile_row(created)
+    if not profile:
+        raise HTTPException(status_code=500, detail="Profile creation returned no data")
+    return profile
+
+
+def require_admin_profile(user: dict) -> dict:
+    profile = resolve_profile_for_user(user)
+    if profile.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return profile
+
+
+def is_analysis_access_allowed(profile: dict, analysis: dict) -> bool:
+    return profile.get("role") == "admin" or analysis.get("user_id") == profile.get("id")
+
+
+def _profile_response_name(profile: dict) -> str:
+    return profile.get("full_name") or profile.get("email") or profile.get("username") or "New User"
 
 
 client = genai.Client(api_key=api_key)
@@ -390,6 +699,188 @@ app.add_middleware(
 
 # Security: Set max upload limit (default 10MB)
 MAX_UPLOAD_SIZE_BYTES = int(os.getenv("MAX_UPLOAD_SIZE", 10 * 1024 * 1024))
+
+
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "ok",
+        "supabase_initialized": supabase_client is not None,
+        "supabase_url_configured": not _is_placeholder(supabase_url),
+        "supabase_key_source": supabase_key_name,
+        "supabase_service_key_configured": not _is_placeholder(os.getenv("SUPABASE_SERVICE_KEY")),
+        "auth_service_configured": not _is_placeholder(AUTH_SERVICE_URL),
+    }
+
+
+@app.get("/api/users/profile")
+async def get_profile(user: dict = Depends(get_current_user)):
+    profile = resolve_profile_for_user(user)
+    return {
+        **profile,
+        "sub": user.get("sub"),
+        "name": _profile_response_name(profile),
+    }
+
+
+@app.put("/api/users/profile")
+async def update_profile(data: dict, user: dict = Depends(get_current_user)):
+    db = require_supabase_client()
+    profile = resolve_profile_for_user(user)
+
+    full_name = (data.get("full_name") or "").strip()
+    username = (data.get("username") or "").strip()
+    phone = (data.get("phone") or "").strip()
+
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    if not username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+
+    updates = {
+        "full_name": full_name,
+        "username": username,
+    }
+    if phone:
+        updates["phone"] = phone
+
+    try:
+        res = db.table("profiles").update(updates).eq("id", profile["id"]).execute()
+    except Exception as e:
+        msg = str(e)
+        if "profiles_username_key" in msg:
+            raise HTTPException(status_code=409, detail="This username is already taken")
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {msg}")
+
+    updated = _first_profile_row(res) or {**profile, **updates}
+    return {
+        **updated,
+        "sub": user.get("sub"),
+        "name": _profile_response_name(updated),
+    }
+
+
+@app.get("/api/analyses")
+async def get_my_analyses(user: dict = Depends(get_current_user)):
+    db = require_supabase_client()
+    profile = resolve_profile_for_user(user)
+
+    res = (
+        db.table("policy_analyses")
+        .select("*")
+        .eq("user_id", profile["id"])
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return res.data or []
+
+
+@app.get("/api/admin/analyses")
+async def get_admin_analyses(user: dict = Depends(get_current_user)):
+    db = require_supabase_client()
+    require_admin_profile(user)
+
+    try:
+        res = (
+            db.table("policy_analyses")
+            .select("*, profiles(email, full_name, phone)")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        print(f"⚠️ Joined admin analysis fetch failed, falling back without profile join: {e}")
+        res = db.table("policy_analyses").select("*").order("created_at", desc=True).execute()
+        return res.data or []
+
+
+@app.get("/api/analysis/{analysis_id}")
+async def get_analysis(analysis_id: str, user: dict = Depends(get_current_user)):
+    db = require_supabase_client()
+    profile = resolve_profile_for_user(user)
+
+    res = db.table("policy_analyses").select("*").eq("id", analysis_id).limit(1).execute()
+    analysis = _first_profile_row(res)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if not is_analysis_access_allowed(profile, analysis):
+        raise HTTPException(status_code=403, detail="Not authorized to view this analysis")
+
+    return {
+        **analysis,
+        "is_read_only": analysis.get("user_id") != profile.get("id"),
+    }
+
+
+@app.get("/api/chats")
+async def get_user_chats(
+    analysis_id: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    db = require_supabase_client()
+    profile = resolve_profile_for_user(user)
+
+    query = db.table("chats").select("id, title, chat_history, updated_at, analysis_id").eq("user_id", profile["id"])
+    if analysis_id:
+        analysis_res = db.table("policy_analyses").select("user_id").eq("id", analysis_id).limit(1).execute()
+        analysis = _first_profile_row(analysis_res)
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        if not is_analysis_access_allowed(profile, analysis):
+            raise HTTPException(status_code=403, detail="Not authorized to view these chats")
+        query = db.table("chats").select("id, title, chat_history, updated_at, analysis_id").eq("analysis_id", analysis_id)
+    else:
+        query = query.is_("analysis_id", "null")
+
+    res = query.order("updated_at", desc=True).execute()
+    return res.data or []
+
+
+@app.patch("/api/chat-threads/{chat_id}")
+async def update_chat_thread(chat_id: str, data: dict, user: dict = Depends(get_current_user)):
+    db = require_supabase_client()
+    profile = resolve_profile_for_user(user)
+
+    chat_res = db.table("chats").select("id, user_id, analysis_id").eq("id", chat_id).limit(1).execute()
+    chat = _first_profile_row(chat_res)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if profile.get("role") != "admin" and chat.get("user_id") != profile.get("id"):
+        raise HTTPException(status_code=403, detail="Not authorized to update this chat")
+
+    updates = {}
+    if "title" in data:
+        title = (data.get("title") or "").strip()[:50]
+        if not title:
+            raise HTTPException(status_code=400, detail="Title cannot be empty")
+        updates["title"] = title
+    if "chat_history" in data:
+        history = data.get("chat_history")
+        if not isinstance(history, list):
+            raise HTTPException(status_code=400, detail="chat_history must be a list")
+        updates["chat_history"] = history
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No supported updates provided")
+
+    res = db.table("chats").update(updates).eq("id", chat_id).execute()
+    return _first_profile_row(res) or {"id": chat_id, **updates}
+
+
+@app.delete("/api/chat-threads/{chat_id}")
+async def delete_chat_thread(chat_id: str, user: dict = Depends(get_current_user)):
+    db = require_supabase_client()
+    profile = resolve_profile_for_user(user)
+
+    chat_res = db.table("chats").select("id, user_id").eq("id", chat_id).limit(1).execute()
+    chat = _first_profile_row(chat_res)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if profile.get("role") != "admin" and chat.get("user_id") != profile.get("id"):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this chat")
+
+    db.table("chats").delete().eq("id", chat_id).execute()
+    return {"message": "Chat deleted successfully"}
 
 
 # Using models discovered via check_models.py (Prioritizing stable models for structured schema capabilities)
@@ -1335,6 +1826,9 @@ async def _compare_policy_core(data: dict, user: dict):
         print("🚀 [API] /api/compare STARTED")
         print(f"🔍 Analyzing: {data.get('company', 'Unknown')} - {data.get('plan', 'Unknown')}")
         print(f"{'='*40}\n")
+        policy_holders = data.get("policy_holders") or []
+        primary_policy_holder = policy_holders[0] if isinstance(policy_holders, list) and policy_holders else {}
+        primary_policy_holder_age = primary_policy_holder.get("age", 30) if isinstance(primary_policy_holder, dict) else 30
         
         # Read features from CSV
         features_csv = FEATURES_CSV_CONTENT
@@ -1793,7 +2287,7 @@ async def _compare_policy_core(data: dict, user: dict):
            - **CRITICAL RULE**: NEVER, under any circumstances, output "Please search" or "Check website". This is an automated report. YOU must provide the data.
            - **Method 1 (Search)**: Try to find the actual premium brochure via Google Search.
            - **Method 2 (Estimation - REQUIRED Fallback)**: If search fails, you **MUST ESTIMATE** the premium based on:
-             - **Age**: {data.get('policy_holders', [{'age': 30}])[0].get('age', 30)} years
+             - **Age**: {primary_policy_holder_age} years
              - **Sum Insured**: {data.get('policy_details', {}).get('sum_insured', '5 Lakh')}
              - **Family Type**: {data.get('policy_type', 'Individual')}
              - **Market Knowledge**: Use your internal knowledge of 2025 Indian Health Insurance pricing.
@@ -2323,17 +2817,8 @@ async def _compare_policy_core(data: dict, user: dict):
         # --- SUPABASE DATABASE INSERT ---
         if user and supabase_client:
             try:
-                user_id = user.get("sub")
-                
-                # [SAFETY] Ensure profile exists before inserting analysis (Foreign Key constraint)
-                profile_check = supabase_client.table("profiles").select("id").eq("id", user_id).execute()
-                if not profile_check.data:
-                    print(f"⚠️ Profile missing for user {user_id}. Creating fallback profile...")
-                    supabase_client.table("profiles").insert({
-                        "id": user_id,
-                        "role": "client",
-                        "full_name": user.get("email", "New User").split("@")[0]
-                    }).execute()
+                profile = resolve_profile_for_user(user)
+                user_id = profile["id"]
 
                 print("💾 Saving complete Analysis Report to Supabase Database...")
                 
@@ -2342,7 +2827,7 @@ async def _compare_policy_core(data: dict, user: dict):
                 result["admin_summary"] = admin_summary
                 
                 insert_data = {
-                    "user_id": user.get("sub"),
+                    "user_id": user_id,
                     "company_name": data.get("company", "Unknown"),
                     "plan_name": data.get("plan", "Unknown"),
                     "extracted_data": data, # The original extracted policy data
@@ -2414,6 +2899,26 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
         report_data = data.get("report", {})
         chat_history = data.get("history", [])
         analysis_id = data.get("analysis_id")
+        profile_for_chat = None
+        profile_id_for_chat = None
+
+        if user and supabase_client:
+            profile_for_chat = resolve_profile_for_user(user)
+            profile_id_for_chat = profile_for_chat["id"]
+
+        if analysis_id and supabase_client and profile_for_chat:
+            analysis_check = (
+                supabase_client.table("policy_analyses")
+                .select("user_id")
+                .eq("id", analysis_id)
+                .limit(1)
+                .execute()
+            )
+            analysis = _first_profile_row(analysis_check)
+            if not analysis:
+                raise HTTPException(status_code=404, detail="Analysis not found")
+            if not is_analysis_access_allowed(profile_for_chat, analysis):
+                raise HTTPException(status_code=403, detail="Not authorized to chat on this analysis")
 
         if analysis_id and (not policy_data or not report_data):
             try:
@@ -2480,21 +2985,26 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
         try:
             analysis_id = data.get("analysis_id")
             chat_db_id = data.get("chat_db_id") # Specific UUID for this conversation thread
+            target_chat_id = None
             
             if user and supabase_client:
+                profile = profile_for_chat or resolve_profile_for_user(user)
+                profile_id = profile_id_for_chat or profile["id"]
                 chat_inserted_or_updated = False
-                target_chat_id = None
 
                 # 1. First Priority: Update by specific Chat UUID
                 if chat_db_id:
                     try:
                         # Append new messages locally for update
                         updated_history = chat_history + [{"role": "user", "text": user_message}, {"role": "ai", "text": reply_text}]
-                        supabase_client.table("chats").update({"chat_history": updated_history}).eq("id", chat_db_id).execute()
-                        chat_inserted_or_updated = True
-                        target_chat_id = chat_db_id
-                    except:
-                        pass
+                        chat_check = supabase_client.table("chats").select("id, user_id").eq("id", chat_db_id).limit(1).execute()
+                        existing_chat = _first_profile_row(chat_check)
+                        if existing_chat and (profile.get("role") == "admin" or existing_chat.get("user_id") == profile_id):
+                            supabase_client.table("chats").update({"chat_history": updated_history}).eq("id", chat_db_id).execute()
+                            chat_inserted_or_updated = True
+                            target_chat_id = chat_db_id
+                    except Exception as e:
+                        print(f"⚠️ Failed to update chat by id {chat_db_id}: {e}")
 
                 # 2. Second Priority: If no specific UUID, but it's an analysis-linked chat...
                 if not chat_inserted_or_updated and analysis_id:
@@ -2510,7 +3020,13 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
                     # Check if we should update an existing "Primary" chat for this analysis
                     # We only auto-update if it's NOT a "New Chat" (history not empty)
                     if not is_first_message:
-                        chat_res = supabase_client.table("chats").select("id, chat_history, title").eq("analysis_id", analysis_id).execute()
+                        chat_res = (
+                            supabase_client.table("chats")
+                            .select("id, chat_history, title")
+                            .eq("analysis_id", analysis_id)
+                            .eq("user_id", profile_id)
+                            .execute()
+                        )
                         if chat_res.data and len(chat_res.data) > 0:
                             chat_id = chat_res.data[0].get("id")
                             existing_history = chat_res.data[0].get("chat_history", [])
@@ -2537,7 +3053,7 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
                              reply_title = user_message[:30] + "..."
 
                     new_history = [{"role": "user", "text": user_message}, {"role": "ai", "text": reply_text}]
-                    insert_data = {"user_id": user.get("sub"), "chat_history": new_history}
+                    insert_data = {"user_id": profile_id, "chat_history": new_history}
                     if analysis_id: insert_data["analysis_id"] = analysis_id
                     if reply_title: insert_data["title"] = reply_title
                         
@@ -2565,22 +3081,14 @@ async def get_chats_for_analysis(analysis_id: str, user: dict = Depends(get_curr
         raise HTTPException(status_code=500, detail="Supabase client not initialized")
         
     try:
-        # Assuming the backend SUPABASE_KEY is the service_role key, it bypasses RLS policies.
-        # Check if the user is authorized. For now, any authenticated user can read this if they have the ID
-        # In a strict production system, you'd verify if the user is an admin or the owner.
-        
-        # We verify if the user reading is either the owner or an admin
-        profile_res = supabase_client.table("profiles").select("role").eq("id", user.get("sub")).execute()
-        is_admin = False
-        if profile_res.data and len(profile_res.data) > 0:
-             is_admin = profile_res.data[0].get("role") == "admin"
+        profile = resolve_profile_for_user(user)
              
         analysis_res = supabase_client.table("policy_analyses").select("user_id").eq("id", analysis_id).execute()
-        is_owner = False
-        if analysis_res.data and len(analysis_res.data) > 0:
-             is_owner = analysis_res.data[0].get("user_id") == user.get("sub")
+        analysis = _first_profile_row(analysis_res)
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
              
-        if not is_admin and not is_owner:
+        if not is_analysis_access_allowed(profile, analysis):
              raise HTTPException(status_code=403, detail="Not authorized to view these chats")
 
         chat_res = supabase_client.table("chats").select("id, title, chat_history, updated_at").eq("analysis_id", analysis_id).order("updated_at", desc=True).execute()
@@ -2603,16 +3111,18 @@ async def delete_analysis(analysis_id: str, user: dict = Depends(get_current_use
         raise HTTPException(status_code=500, detail="Supabase client not initialized")
         
     try:
-        user_id = user.get("sub")
+        profile = resolve_profile_for_user(user)
+        user_id = profile["id"]
         
         # 1. Check if user is Admin or Owner
-        profile_res = supabase_client.table("profiles").select("role").eq("id", user_id).execute()
-        is_admin = False
-        if profile_res.data and len(profile_res.data) > 0:
-            is_admin = profile_res.data[0].get("role") == "admin"
+        is_admin = profile.get("role") == "admin"
             
-        # Select user_id and extracted_data (since pdf_file_url is stored inside JSONB)
-        analysis_res = supabase_client.table("policy_analyses").select("user_id, extracted_data").eq("id", analysis_id).execute()
+        analysis_res = (
+            supabase_client.table("policy_analyses")
+            .select("user_id, extracted_data, pdf_file_url")
+            .eq("id", analysis_id)
+            .execute()
+        )
         
         if not analysis_res.data:
             raise HTTPException(status_code=404, detail="Analysis not found")
@@ -2625,7 +3135,7 @@ async def delete_analysis(analysis_id: str, user: dict = Depends(get_current_use
             
         # 2. Delete file from Storage if exists
         extracted_data = analysis.get("extracted_data") or {}
-        pdf_url = extracted_data.get("pdf_file_url")
+        pdf_url = analysis.get("pdf_file_url") or extracted_data.get("pdf_file_url")
         if pdf_url:
             try:
                 # Extract path from URL: https://[project-id].supabase.co/storage/v1/object/public/policy_pdfs/[path]
@@ -2658,24 +3168,48 @@ async def delete_analysis(analysis_id: str, user: dict = Depends(get_current_use
 
 @app.delete("/api/user/self")
 async def delete_self(user: dict = Depends(get_current_user)):
-    """Deletes the currently authenticated user's account."""
+    """Deletes the currently authenticated user's application data."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
         
-    user_id = user.get("sub")
     if not supabase_client:
         raise HTTPException(status_code=500, detail="Supabase client not initialized")
         
     try:
-        # Use the admin client (Service Role key) to delete the user from auth.users
-        # Note: Profiles and other tables will cascade delete due to foreign key constraints in our schema.
-        print(f"🗑️ Request to delete user account: {user_id}")
+        profile = resolve_profile_for_user(user)
+        user_id = profile["id"]
+        print(f"🗑️ Request to delete application data for profile: {user_id}")
         
-        # In supabase-py, auth.admin.delete_user requires the service role key
-        supabase_client.auth.admin.delete_user(user_id)
+        analyses_res = (
+            supabase_client.table("policy_analyses")
+            .select("id, extracted_data, pdf_file_url")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        analyses = analyses_res.data or []
+
+        for analysis in analyses:
+            extracted_data = analysis.get("extracted_data") or {}
+            pdf_url = analysis.get("pdf_file_url") or extracted_data.get("pdf_file_url")
+            if pdf_url and "/public/policy_pdfs/" in pdf_url:
+                try:
+                    path = urllib.parse.unquote(pdf_url.split("/public/policy_pdfs/")[1])
+                    supabase_client.storage.from_("policy_pdfs").remove([path])
+                except Exception as e:
+                    print(f"⚠️ Failed to delete PDF for analysis {analysis.get('id')}: {e}")
+
+        # Chats must be deleted first because chats.analysis_id may not cascade.
+        supabase_client.table("chats").delete().eq("user_id", user_id).execute()
+        supabase_client.table("policy_analyses").delete().eq("user_id", user_id).execute()
+        supabase_client.table("profiles").delete().eq("id", user_id).execute()
         
-        print(f"✅ User {user_id} deleted successfully.")
-        return {"message": "Account deleted successfully"}
+        print(f"✅ Application data for profile {user_id} deleted successfully.")
+        return {
+            "message": (
+                "Application data deleted successfully. Authentication is managed by Cognito; "
+                "delete the Cognito account through the auth service if required."
+            )
+        }
         
     except Exception as e:
         print(f"❌ Error deleting user: {e}")

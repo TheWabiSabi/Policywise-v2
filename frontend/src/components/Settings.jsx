@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { auth } from '../authClient';
+import { auth, apiFetch } from '../authClient';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal';
-
-import { API_BASE } from '../config';
 
 export default function Settings({ session, fullName, username, onProfileUpdate }) {
     const navigate = useNavigate();
@@ -37,13 +34,7 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
 
     const fetchProfile = async () => {
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('full_name, username')
-                .eq('id', session.user.id)
-                .single();
-
-            if (error) throw error;
+            const data = await apiFetch('/users/profile');
             if (data) {
                 const parts = data.full_name?.split(' ') || [];
                 setFirstName(parts[0] || '');
@@ -65,22 +56,13 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
             if (!newFullName) throw new Error("Name cannot be empty");
             if (!newUsername) throw new Error("Username cannot be empty");
 
-            // Use upsert to handle cases where the profile row might be missing
-            const { data, error } = await supabase
-                .from('profiles')
-                .upsert({
-                    id: session.user.id,
+            await apiFetch('/users/profile', {
+                method: 'PUT',
+                body: JSON.stringify({
                     full_name: newFullName,
                     username: newUsername
-                }, { onConflict: 'id' })
-                .select();
-
-            if (error) throw error;
-
-            // In some RLS configurations, upsert/update might return empty data if blocked
-            if (!data || data.length === 0) {
-                throw new Error("Update failed. Please ensure you have applied the RLS Update policy in Supabase.");
-            }
+                })
+            });
 
             setSuccess("Profile updated successfully!");
 
@@ -114,17 +96,7 @@ export default function Settings({ session, fullName, username, onProfileUpdate 
 
             if (!activeToken) throw new Error("No active session found. Please log in again.");
 
-            const res = await fetch(`${API_BASE}/user/self`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${activeToken}`
-                }
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.detail || "Failed to delete account");
-            }
+            await apiFetch('/user/self', { method: 'DELETE' });
 
             await auth.signOut();
             localStorage.clear();
