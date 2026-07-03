@@ -1,6 +1,7 @@
 import os
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
+
+sys.stdout.reconfigure(encoding="utf-8")
 import uuid
 import time
 import urllib.parse
@@ -36,10 +37,15 @@ os.chdir(BASE_DIR)
 AWS_REGION = os.getenv("COGNITO_REGION") or os.getenv("AWS_REGION", "us-east-1")
 COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "")
 COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "")
-AUTH_SERVICE_URL = (os.getenv("AUTH_SERVICE_URL") or os.getenv("NEXT_PUBLIC_AUTH_SERVICE_URL") or "").rstrip("/")
+AUTH_SERVICE_URL = (
+    os.getenv("AUTH_SERVICE_URL") or os.getenv("NEXT_PUBLIC_AUTH_SERVICE_URL") or ""
+).rstrip("/")
 
-_COGNITO_ISSUER = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+_COGNITO_ISSUER = (
+    f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+)
 _JWKS_URI = f"{_COGNITO_ISSUER}/.well-known/jwks.json"
+
 
 def _is_placeholder(value: str) -> bool:
     normalized = (value or "").strip().lower()
@@ -49,6 +55,7 @@ def _is_placeholder(value: str) -> bool:
         or "xxxxx" in normalized
         or normalized in {"change-me", "todo", "placeholder"}
     )
+
 
 def _require_cognito_config():
     missing = []
@@ -68,20 +75,25 @@ def _require_cognito_config():
             ),
         )
 
+
 @lru_cache(maxsize=1)
 def _get_jwks_client():
     return PyJWKClient(_JWKS_URI, cache_keys=True)
 
+
 _security = HTTPBearer(auto_error=False)
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_security),
 ):
     if not credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No token provided")
-    
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="No token provided"
+        )
+
     token = credentials.credentials
-    
+
     try:
         _require_cognito_config()
         jwks_client = _get_jwks_client()
@@ -115,9 +127,13 @@ def get_current_user(
             "token": token,
         }
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
+        )
     except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -130,22 +146,27 @@ def get_current_user(
             ),
         )
 
+
 class ComponentSchema(BaseModel):
     label: str
     value: str
 
+
 class SumInsuredSchema(BaseModel):
     total: str
     components: List[ComponentSchema]
+
 
 class PolicyHolderSchema(BaseModel):
     name: str = Field(..., description="Extract the full name of the policy holder")
     dob: str
     age: str
 
+
 class PolicyDetailsSchema(BaseModel):
     start_date: str
     vintage: str
+
 
 class Pass1Schema(BaseModel):
     company: str
@@ -159,14 +180,25 @@ class Pass1Schema(BaseModel):
     sum_insured: SumInsuredSchema
     policy_holders: List[PolicyHolderSchema]
 
+
 class FeatureEvaluation(BaseModel):
-    feature_name: str = Field(..., description="The exact standardized Term from the REFERENCE FEATURES LIST.")
-    verbatim_quote: str = Field(..., description="Extract this FIRST, before determining the value. Quote the exact text from the document.")
-    value: str = Field(..., description="The calculated value/status of the feature based on the quote.")
+    feature_name: str = Field(
+        ..., description="The exact standardized Term from the REFERENCE FEATURES LIST."
+    )
+    verbatim_quote: str = Field(
+        ...,
+        description="Extract this FIRST, before determining the value. Quote the exact text from the document.",
+    )
+    value: str = Field(
+        ...,
+        description="The calculated value/status of the feature based on the quote.",
+    )
+
 
 class Pass2Schema(BaseModel):
     features: List[FeatureEvaluation]
     comprehensive_findings: str
+
 
 api_key = os.getenv("GEMINI_API_KEY")
 if _is_placeholder(api_key):
@@ -185,7 +217,11 @@ supabase_key_candidates = [
     ("SUPABASE_ANON_KEY", os.getenv("SUPABASE_ANON_KEY")),
 ]
 supabase_key_name, supabase_key = next(
-    ((name, value) for name, value in supabase_key_candidates if not _is_placeholder(value)),
+    (
+        (name, value)
+        for name, value in supabase_key_candidates
+        if not _is_placeholder(value)
+    ),
     (None, None),
 )
 if _is_placeholder(supabase_url) or _is_placeholder(supabase_key):
@@ -230,10 +266,18 @@ def _first_present(*values):
 
 
 def _profile_name_from_identity(identity: dict) -> str:
-    first_name = _first_present(identity.get("first_name"), identity.get("given_name"), identity.get("firstName"))
-    last_name = _first_present(identity.get("last_name"), identity.get("family_name"), identity.get("lastName"))
+    first_name = _first_present(
+        identity.get("first_name"),
+        identity.get("given_name"),
+        identity.get("firstName"),
+    )
+    last_name = _first_present(
+        identity.get("last_name"), identity.get("family_name"), identity.get("lastName")
+    )
     composed_name = " ".join(part for part in [first_name, last_name] if part).strip()
-    name = _first_present(identity.get("name"), identity.get("full_name"), composed_name)
+    name = _first_present(
+        identity.get("name"), identity.get("full_name"), composed_name
+    )
     email = _normalize_email(identity.get("email") or identity.get("username"))
     username = (identity.get("username") or "").strip()
     return str(name or (email.split("@")[0] if email else "") or username or "New User")
@@ -350,18 +394,26 @@ def _is_supabase_permission_error(error: Exception) -> bool:
     )
 
 
-def _select_profile(db: Client, column: str, value: str, selected: str, basic_selected: str):
+def _select_profile(
+    db: Client, column: str, value: str, selected: str, basic_selected: str
+):
     try:
         return _first_profile_row(
             db.table("profiles").select(selected).eq(column, value).limit(1).execute()
         )
     except Exception as e:
         if _is_missing_cognito_sub_error(e):
-            print("⚠️ profiles.cognito_sub is missing. Apply migrations/001_cognito_profiles.sql.")
+            print(
+                "⚠️ profiles.cognito_sub is missing. Apply migrations/001_cognito_profiles.sql."
+            )
             if column == "cognito_sub":
                 return None
             return _first_profile_row(
-                db.table("profiles").select(basic_selected).eq(column, value).limit(1).execute()
+                db.table("profiles")
+                .select(basic_selected)
+                .eq(column, value)
+                .limit(1)
+                .execute()
             )
         raise
 
@@ -375,7 +427,9 @@ def resolve_profile_for_user(user: dict, create_if_missing: bool = True) -> dict
     username = identity["username"] or email or cognito_sub
 
     if not cognito_sub and not email:
-        raise HTTPException(status_code=401, detail="Authenticated user is missing identity claims")
+        raise HTTPException(
+            status_code=401, detail="Authenticated user is missing identity claims"
+        )
 
     selected = "id, email, username, full_name, phone, role, cognito_sub, created_at"
     basic_selected = "id, email, username, full_name, phone, role, created_at"
@@ -383,19 +437,31 @@ def resolve_profile_for_user(user: dict, create_if_missing: bool = True) -> dict
 
     if cognito_sub:
         try:
-            profile = _select_profile(db, "cognito_sub", cognito_sub, selected, basic_selected)
+            profile = _select_profile(
+                db, "cognito_sub", cognito_sub, selected, basic_selected
+            )
         except Exception as e:
-            print(f"⚠️ Profile lookup by cognito_sub failed. Has the migration run? {e}")
+            print(
+                f"⚠️ Profile lookup by cognito_sub failed. Has the migration run? {e}"
+            )
 
     if not profile and email:
         try:
             profile = _first_profile_row(
-                db.table("profiles").select(selected).ilike("email", email).limit(1).execute()
+                db.table("profiles")
+                .select(selected)
+                .ilike("email", email)
+                .limit(1)
+                .execute()
             )
         except Exception as e:
             if _is_missing_cognito_sub_error(e):
                 profile = _first_profile_row(
-                    db.table("profiles").select(basic_selected).ilike("email", email).limit(1).execute()
+                    db.table("profiles")
+                    .select(basic_selected)
+                    .ilike("email", email)
+                    .limit(1)
+                    .execute()
                 )
             else:
                 raise
@@ -415,12 +481,21 @@ def resolve_profile_for_user(user: dict, create_if_missing: bool = True) -> dict
             updates["email"] = email
         if username and not profile.get("username"):
             updates["username"] = username
-        if identity.get("full_name") and profile.get("full_name") in {None, "", "New User"}:
+        if identity.get("full_name") and profile.get("full_name") in {
+            None,
+            "",
+            "New User",
+        }:
             updates["full_name"] = identity["full_name"]
 
         if updates:
             try:
-                updated = db.table("profiles").update(updates).eq("id", profile["id"]).execute()
+                updated = (
+                    db.table("profiles")
+                    .update(updates)
+                    .eq("id", profile["id"])
+                    .execute()
+                )
                 if updated.data:
                     profile = {**profile, **updates}
             except Exception as e:
@@ -441,7 +516,9 @@ def resolve_profile_for_user(user: dict, create_if_missing: bool = True) -> dict
         created = db.table("profiles").insert(insert_data).execute()
     except Exception as e:
         if _is_missing_cognito_sub_error(e):
-            print("⚠️ Creating profile without cognito_sub because migration has not been applied.")
+            print(
+                "⚠️ Creating profile without cognito_sub because migration has not been applied."
+            )
             insert_data.pop("cognito_sub", None)
             try:
                 created = db.table("profiles").insert(insert_data).execute()
@@ -453,7 +530,10 @@ def resolve_profile_for_user(user: dict, create_if_missing: bool = True) -> dict
                 )
         else:
             print(f"❌ Failed to create Cognito-backed profile: {e}")
-            if _is_supabase_permission_error(e) or supabase_key_name != "SUPABASE_SERVICE_KEY":
+            if (
+                _is_supabase_permission_error(e)
+                or supabase_key_name != "SUPABASE_SERVICE_KEY"
+            ):
                 raise HTTPException(
                     status_code=500,
                     detail=(
@@ -481,11 +561,18 @@ def require_admin_profile(user: dict) -> dict:
 
 
 def is_analysis_access_allowed(profile: dict, analysis: dict) -> bool:
-    return profile.get("role") == "admin" or analysis.get("user_id") == profile.get("id")
+    return profile.get("role") == "admin" or analysis.get("user_id") == profile.get(
+        "id"
+    )
 
 
 def _profile_response_name(profile: dict) -> str:
-    return profile.get("full_name") or profile.get("email") or profile.get("username") or "New User"
+    return (
+        profile.get("full_name")
+        or profile.get("email")
+        or profile.get("username")
+        or "New User"
+    )
 
 
 client = genai.Client(api_key=api_key)
@@ -495,6 +582,7 @@ app = FastAPI()
 # Stores running/completed jobs in memory. Jobs expire after 30 minutes.
 JOB_STORE: dict = {}
 
+
 def _cleanup_old_jobs():
     """Remove jobs older than 30 minutes to prevent memory leaks."""
     cutoff = time.time() - 1800
@@ -502,10 +590,11 @@ def _cleanup_old_jobs():
     for jid in expired:
         JOB_STORE.pop(jid, None)
 
+
 # --- LOAD PRE-CALCULATED PLAN SCORES & USPs & RAW CSV CONTENT ---
 PLAN_SCORES_DATA = {}
 
-PLAN_USP_DATA = {} # Restored for USP.csv
+PLAN_USP_DATA = {}  # Restored for USP.csv
 DATASET_COLUMNS = []
 
 # Global CSV Content Strings (Loaded once to save I/O)
@@ -516,6 +605,7 @@ PLANS_DATABASE_CSV_CONTENT = ""
 USP_CSV_CONTENT = ""
 
 SYNONYM_MAP = {}  # feature_name -> list of alt terms
+
 
 def build_synonym_map():
     global SYNONYM_MAP
@@ -545,43 +635,73 @@ def build_synonym_map():
     # Hard-coded insurance domain synonyms
     hardcoded = {
         "Consumables & Non-Payable Cover": [
-            "claim protector", "safe guard", "safeguard+", "non-payable cover",
-            "consumable cover", "list I II III IV"
+            "claim protector",
+            "safe guard",
+            "safeguard+",
+            "non-payable cover",
+            "consumable cover",
+            "list I II III IV",
         ],
         "Restoration Benefit": [
-            "recharge benefit", "auto restore", "automatic reinstatement",
-            "sum insured reinstatement", "super recharge", "m-iracle"
+            "recharge benefit",
+            "auto restore",
+            "automatic reinstatement",
+            "sum insured reinstatement",
+            "super recharge",
+            "m-iracle",
         ],
         "No Claim Bonus": [
-            "ncb", "cumulative bonus", "no claim benefit", "bonus super",
-            "super ncb", "health bonus", "booster benefit"
+            "ncb",
+            "cumulative bonus",
+            "no claim benefit",
+            "bonus super",
+            "super ncb",
+            "health bonus",
+            "booster benefit",
         ],
         "Inflation Protector": [
-            "inflation shield", "sum insured protector", "annual enhancement",
-            "sum insured safeguard", "care shield", "enhanced si"
+            "inflation shield",
+            "sum insured protector",
+            "annual enhancement",
+            "sum insured safeguard",
+            "care shield",
+            "enhanced si",
         ],
         "Pre & Post Hospitalization": [
-            "pre-hospitalisation", "post-hospitalisation", "pre hospital",
-            "post hospital", "pre & post", "pre/post"
+            "pre-hospitalisation",
+            "post-hospitalisation",
+            "pre hospital",
+            "post hospital",
+            "pre & post",
+            "pre/post",
         ],
         "Infinite Care": [
-            "unlimited cover", "no claim limit", "infinite cover", "limitless care",
-            "unlimited sum insured"
+            "unlimited cover",
+            "no claim limit",
+            "infinite cover",
+            "limitless care",
+            "unlimited sum insured",
         ],
         "Room Rent": [
-            "room rent limit", "accommodation charges", "room charges",
-            "room category", "hospital room"
+            "room rent limit",
+            "accommodation charges",
+            "room charges",
+            "room category",
+            "hospital room",
         ],
         "ICU Charges": [
-            "icu expenses", "intensive care", "critical care unit", "icu benefit"
+            "icu expenses",
+            "intensive care",
+            "critical care unit",
+            "icu benefit",
         ],
         "In Patient Hospitalization": [
-            "inpatient hospitalisation", "ipd", "in-patient expenses",
-            "hospitalisation benefit"
+            "inpatient hospitalisation",
+            "ipd",
+            "in-patient expenses",
+            "hospitalisation benefit",
         ],
-        "Day Care Treatments": [
-            "day care procedures", "daycare", "day care surgeries"
-        ],
+        "Day Care Treatments": ["day care procedures", "daycare", "day care surgeries"],
     }
     for key, syn_list in hardcoded.items():
         if key in SYNONYM_MAP:
@@ -599,7 +719,8 @@ def build_synonym_map():
             )
     return "\n".join(instructions)
 
-COMPULSORY_FEATURES = set() # Standard features that MUST be covered
+
+COMPULSORY_FEATURES = set()  # Standard features that MUST be covered
 CURRENT_INFLATION_RATE = 7.0  # Used for Inflation Shield Calculation
 
 try:
@@ -609,20 +730,28 @@ try:
             raw_data = json.load(f)
             for k, v in raw_data.items():
                 PLAN_SCORES_DATA[k.lower().strip()] = v
-        print(f"DEBUG: Loaded {len(PLAN_SCORES_DATA)} plan scores (Simple-Avg) successfully.")
+        print(
+            f"DEBUG: Loaded {len(PLAN_SCORES_DATA)} plan scores (Simple-Avg) successfully."
+        )
 
     if os.path.exists("Insurance_plan_dataset.csv"):
         # Load raw content for AI context
-        with open("Insurance_plan_dataset.csv", "r", encoding="utf-8", errors="replace") as f:
-             PLANS_DATABASE_CSV_CONTENT = f.read()
+        with open(
+            "Insurance_plan_dataset.csv", "r", encoding="utf-8", errors="replace"
+        ) as f:
+            PLANS_DATABASE_CSV_CONTENT = f.read()
 
         # Re-read for structured data parsing
-        with open("Insurance_plan_dataset.csv", "r", encoding="utf-8", errors="replace") as f:
+        with open(
+            "Insurance_plan_dataset.csv", "r", encoding="utf-8", errors="replace"
+        ) as f:
             reader = csv.reader(f)
             headers = next(reader)
             # Filter out non-feature columns
-            skip_cols = ['Sr No', 'Insurance Company', 'Base Plan Name']
-            DATASET_COLUMNS = [h.strip().lower() for h in headers if h not in skip_cols and h.strip()]
+            skip_cols = ["Sr No", "Insurance Company", "Base Plan Name"]
+            DATASET_COLUMNS = [
+                h.strip().lower() for h in headers if h not in skip_cols and h.strip()
+            ]
 
         print(f"DEBUG: Loaded {len(DATASET_COLUMNS)} dataset columns for whitelist.")
     else:
@@ -643,13 +772,17 @@ try:
         print("WARNING: Synonym Map generation resulted in empty output.")
 
     if os.path.exists("company_performance_ratios.csv"):
-        with open("company_performance_ratios.csv", "r", encoding="utf-8", errors="replace") as f:
+        with open(
+            "company_performance_ratios.csv", "r", encoding="utf-8", errors="replace"
+        ) as f:
             COMPANY_RATIOS_CSV_CONTENT = f.read()
     else:
         print("WARNING: company_performance_ratios.csv not found.")
 
     if os.path.exists("compulsory features.csv"):
-        with open("compulsory features.csv", "r", encoding="utf-8", errors="replace") as f:
+        with open(
+            "compulsory features.csv", "r", encoding="utf-8", errors="replace"
+        ) as f:
             reader = csv.DictReader(f)
             for row in reader:
                 feat = row.get("Feature", "").strip()
@@ -662,8 +795,10 @@ try:
     # --- RESTORED: Load USPs from USP.csv ---
     if os.path.exists("USP.csv"):
         with open("USP.csv", "r", encoding="utf-8", errors="replace") as f:
-            USP_CSV_CONTENT = f.read() # Load raw content for AI context to avoid duplicate key issues
-            
+            USP_CSV_CONTENT = (
+                f.read()
+            )  # Load raw content for AI context to avoid duplicate key issues
+
             # Also load dict for legacy lookups (if any)
             f.seek(0)
             reader = csv.DictReader(f)
@@ -687,12 +822,15 @@ except Exception as e:
 
 
 # Security: Get allowed origins from environment, default to localhost for development
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173").split(",")
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173",
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in allowed_origins if origin.strip()],
-    allow_credentials=True, # Allow credentials for robust auth flows
+    allow_credentials=True,  # Allow credentials for robust auth flows
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -708,7 +846,9 @@ async def health_check():
         "supabase_initialized": supabase_client is not None,
         "supabase_url_configured": not _is_placeholder(supabase_url),
         "supabase_key_source": supabase_key_name,
-        "supabase_service_key_configured": not _is_placeholder(os.getenv("SUPABASE_SERVICE_KEY")),
+        "supabase_service_key_configured": not _is_placeholder(
+            os.getenv("SUPABASE_SERVICE_KEY")
+        ),
         "auth_service_configured": not _is_placeholder(AUTH_SERVICE_URL),
     }
 
@@ -749,7 +889,9 @@ async def update_profile(data: dict, user: dict = Depends(get_current_user)):
     except Exception as e:
         msg = str(e)
         if "profiles_username_key" in msg:
-            raise HTTPException(status_code=409, detail="This username is already taken")
+            raise HTTPException(
+                status_code=409, detail="This username is already taken"
+            )
         raise HTTPException(status_code=500, detail=f"Failed to update profile: {msg}")
 
     updated = _first_profile_row(res) or {**profile, **updates}
@@ -789,8 +931,15 @@ async def get_admin_analyses(user: dict = Depends(get_current_user)):
         )
         return res.data or []
     except Exception as e:
-        print(f"⚠️ Joined admin analysis fetch failed, falling back without profile join: {e}")
-        res = db.table("policy_analyses").select("*").order("created_at", desc=True).execute()
+        print(
+            f"⚠️ Joined admin analysis fetch failed, falling back without profile join: {e}"
+        )
+        res = (
+            db.table("policy_analyses")
+            .select("*")
+            .order("created_at", desc=True)
+            .execute()
+        )
         return res.data or []
 
 
@@ -799,12 +948,16 @@ async def get_analysis(analysis_id: str, user: dict = Depends(get_current_user))
     db = require_supabase_client()
     profile = resolve_profile_for_user(user)
 
-    res = db.table("policy_analyses").select("*").eq("id", analysis_id).limit(1).execute()
+    res = (
+        db.table("policy_analyses").select("*").eq("id", analysis_id).limit(1).execute()
+    )
     analysis = _first_profile_row(res)
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
     if not is_analysis_access_allowed(profile, analysis):
-        raise HTTPException(status_code=403, detail="Not authorized to view this analysis")
+        raise HTTPException(
+            status_code=403, detail="Not authorized to view this analysis"
+        )
 
     return {
         **analysis,
@@ -820,15 +973,31 @@ async def get_user_chats(
     db = require_supabase_client()
     profile = resolve_profile_for_user(user)
 
-    query = db.table("chats").select("id, title, chat_history, updated_at, analysis_id").eq("user_id", profile["id"])
+    query = (
+        db.table("chats")
+        .select("id, title, chat_history, updated_at, analysis_id")
+        .eq("user_id", profile["id"])
+    )
     if analysis_id:
-        analysis_res = db.table("policy_analyses").select("user_id").eq("id", analysis_id).limit(1).execute()
+        analysis_res = (
+            db.table("policy_analyses")
+            .select("user_id")
+            .eq("id", analysis_id)
+            .limit(1)
+            .execute()
+        )
         analysis = _first_profile_row(analysis_res)
         if not analysis:
             raise HTTPException(status_code=404, detail="Analysis not found")
         if not is_analysis_access_allowed(profile, analysis):
-            raise HTTPException(status_code=403, detail="Not authorized to view these chats")
-        query = db.table("chats").select("id, title, chat_history, updated_at, analysis_id").eq("analysis_id", analysis_id)
+            raise HTTPException(
+                status_code=403, detail="Not authorized to view these chats"
+            )
+        query = (
+            db.table("chats")
+            .select("id, title, chat_history, updated_at, analysis_id")
+            .eq("analysis_id", analysis_id)
+        )
     else:
         query = query.is_("analysis_id", "null")
 
@@ -837,16 +1006,26 @@ async def get_user_chats(
 
 
 @app.patch("/api/chat-threads/{chat_id}")
-async def update_chat_thread(chat_id: str, data: dict, user: dict = Depends(get_current_user)):
+async def update_chat_thread(
+    chat_id: str, data: dict, user: dict = Depends(get_current_user)
+):
     db = require_supabase_client()
     profile = resolve_profile_for_user(user)
 
-    chat_res = db.table("chats").select("id, user_id, analysis_id").eq("id", chat_id).limit(1).execute()
+    chat_res = (
+        db.table("chats")
+        .select("id, user_id, analysis_id")
+        .eq("id", chat_id)
+        .limit(1)
+        .execute()
+    )
     chat = _first_profile_row(chat_res)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     if profile.get("role") != "admin" and chat.get("user_id") != profile.get("id"):
-        raise HTTPException(status_code=403, detail="Not authorized to update this chat")
+        raise HTTPException(
+            status_code=403, detail="Not authorized to update this chat"
+        )
 
     updates = {}
     if "title" in data:
@@ -872,50 +1051,64 @@ async def delete_chat_thread(chat_id: str, user: dict = Depends(get_current_user
     db = require_supabase_client()
     profile = resolve_profile_for_user(user)
 
-    chat_res = db.table("chats").select("id, user_id").eq("id", chat_id).limit(1).execute()
+    chat_res = (
+        db.table("chats").select("id, user_id").eq("id", chat_id).limit(1).execute()
+    )
     chat = _first_profile_row(chat_res)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     if profile.get("role") != "admin" and chat.get("user_id") != profile.get("id"):
-        raise HTTPException(status_code=403, detail="Not authorized to delete this chat")
+        raise HTTPException(
+            status_code=403, detail="Not authorized to delete this chat"
+        )
 
     db.table("chats").delete().eq("id", chat_id).execute()
     return {"message": "Chat deleted successfully"}
 
 
 # Using models discovered via check_models.py (Prioritizing stable models for structured schema capabilities)
-PASS1_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash"
-]
+PASS1_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 
-PASS2_MODELS = [
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-1.5-pro"
-]
+PASS2_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"]
 
 # Legacy compatibility
 MODEL_CANDIDATES = PASS1_MODELS
 
 # City Tier Configuration
 TIER_1_CITIES = [
-    "mumbai", "delhi", "bangalore", "bengaluru", "hyderabad", "chennai", "kolkata", 
-    "pune", "ahmedabad", "gurgaon", "gurugram", "noida"
+    "mumbai",
+    "delhi",
+    "bangalore",
+    "bengaluru",
+    "hyderabad",
+    "chennai",
+    "kolkata",
+    "pune",
+    "ahmedabad",
+    "gurgaon",
+    "gurugram",
+    "noida",
 ]
 
 # Blacklisted Companies (User Request)
 BLACKLISTED_COMPANIES = ["niva bupa", "care health", "star health"]
 
 # Financial Constants
-CURRENT_INFLATION_RATE = 7.0 # 7% Annual Inflation calculation for Shield
-
+CURRENT_INFLATION_RATE = 7.0  # 7% Annual Inflation calculation for Shield
 
 
 TIER_1_HIGH_CITIES = ["mumbai", "delhi", "bangalore", "bengaluru"]
-TIER_1_MID_CITIES  = ["hyderabad", "chennai", "kolkata", "pune", "ahmedabad",
-                       "gurgaon", "gurugram", "noida"]
+TIER_1_MID_CITIES = [
+    "hyderabad",
+    "chennai",
+    "kolkata",
+    "pune",
+    "ahmedabad",
+    "gurgaon",
+    "gurugram",
+    "noida",
+]
+
 
 def analyze_user_profile(extracted_data):
     profile = {
@@ -924,24 +1117,28 @@ def analyze_user_profile(extracted_data):
         "recommended_min_si": "10 Lakhs",
         "healthcare_cost_level": "Moderate",
         "life_stage": "Individual",
-        "family_type": "Individual"
+        "family_type": "Individual",
     }
 
     city = extracted_data.get("city", "").lower().strip()
     if any(c in city for c in TIER_1_HIGH_CITIES):
-        profile.update({
-            "city_tier": "Tier 1 Premium Metro",
-            "recommended_si_range": "₹50L – ₹1Cr",
-            "recommended_min_si": "50 Lakhs",
-            "healthcare_cost_level": "Very High"
-        })
+        profile.update(
+            {
+                "city_tier": "Tier 1 Premium Metro",
+                "recommended_si_range": "₹50L – ₹1Cr",
+                "recommended_min_si": "50 Lakhs",
+                "healthcare_cost_level": "Very High",
+            }
+        )
     elif any(c in city for c in TIER_1_MID_CITIES):
-        profile.update({
-            "city_tier": "Tier 1 Metro",
-            "recommended_si_range": "₹25L – ₹50L",
-            "recommended_min_si": "25 Lakhs",
-            "healthcare_cost_level": "High"
-        })
+        profile.update(
+            {
+                "city_tier": "Tier 1 Metro",
+                "recommended_si_range": "₹25L – ₹50L",
+                "recommended_min_si": "25 Lakhs",
+                "healthcare_cost_level": "High",
+            }
+        )
 
     policy_type = extracted_data.get("coverage", "").lower()
     members = extracted_data.get("policy_holders", [])
@@ -959,12 +1156,12 @@ def analyze_user_profile(extracted_data):
     max_age = max(ages) if ages else 30
     has_medical_history = extracted_data.get("has_medical_history", False)
 
-    has_senior      = any(a >= 60 for a in ages)
+    has_senior = any(a >= 60 for a in ages)
     has_middle_aged = any(50 <= a < 60 for a in ages)
-    has_child       = any(a <= 18 for a in ages)
+    has_child = any(a <= 18 for a in ages)
     has_young_adult = any(18 < a < 35 for a in ages)
     needs_maternity = any(20 <= a <= 38 for a in ages)
-    multi_gen       = (has_senior or has_middle_aged) and (has_child or has_young_adult)
+    multi_gen = (has_senior or has_middle_aged) and (has_child or has_young_adult)
 
     profile["family_flags"] = {
         "has_senior": has_senior,
@@ -976,13 +1173,21 @@ def analyze_user_profile(extracted_data):
     }
 
     if max_age > 55 and has_medical_history:
-        profile["age_group"] = "Senior WITH Medical History (CRITICAL: Suggest separate targeted plan emphasizing Day-1 PED cover)"
+        profile["age_group"] = (
+            "Senior WITH Medical History (CRITICAL: Suggest separate targeted plan emphasizing Day-1 PED cover)"
+        )
     elif max_age < 35:
-        profile["age_group"] = "Young Adult (Prioritize: Low Premium, Wellness, Lock-in Age)"
+        profile["age_group"] = (
+            "Young Adult (Prioritize: Low Premium, Wellness, Lock-in Age)"
+        )
     elif max_age < 50:
-        profile["age_group"] = "Mid-Life (Prioritize: Comprehensive features, Maternity if relevant)"
+        profile["age_group"] = (
+            "Mid-Life (Prioritize: Comprehensive features, Maternity if relevant)"
+        )
     else:
-        profile["age_group"] = "Senior (Prioritize: No Co-pay, Short Wait Periods, PED Cover)"
+        profile["age_group"] = (
+            "Senior (Prioritize: No Co-pay, Short Wait Periods, PED Cover)"
+        )
 
     priority = []
     if has_senior or has_middle_aged:
@@ -1002,7 +1207,6 @@ def analyze_user_profile(extracted_data):
     return profile
 
 
-
 def match_policy_in_csv(company_name, plan_name, csv_content):
     """
     Robustly matches a policy in the CSV database.
@@ -1014,42 +1218,45 @@ def match_policy_in_csv(company_name, plan_name, csv_content):
 
     best_match = None
     highest_ratio = 0.0
-    
+
     # Normalize inputs safely
     norm_company = str(company_name).lower().strip() if company_name else ""
     norm_plan = str(plan_name).lower().strip() if plan_name else ""
-    
+
     if not norm_plan:
         return None
 
     reader = csv.DictReader(io.StringIO(csv_content))
-    
+
     for row in reader:
         # Check Company Match (handle "Co. Ltd" etc)
         csv_company = str(row.get("Insurance Company", "")).lower()
         if norm_company and csv_company:
             if norm_company not in csv_company and csv_company not in norm_company:
-                 continue # Skip if company doesn't match at all
-             
+                continue  # Skip if company doesn't match at all
+
         # Check Plan Match
         csv_plan = str(row.get("Base Plan Name", "")).lower()
         ratio = difflib.SequenceMatcher(None, norm_plan, csv_plan).ratio()
-        
+
         # Boost ratio if exact substring match
         if csv_plan and norm_plan in csv_plan:
             ratio += 0.1
-            
+
         if ratio > highest_ratio:
             highest_ratio = ratio
             best_match = row
 
     # Threshold for acceptance
-    if highest_ratio > 0.5 and best_match: # generous threshold due to variations
-        matched_name = best_match.get('Base Plan Name', 'Unknown Plan')
-        print(f"DEBUG: Found CSV Match! Input: '{plan_name}' -> Matched: '{matched_name}' (Score: {highest_ratio:.2f})")
+    if highest_ratio > 0.5 and best_match:  # generous threshold due to variations
+        matched_name = best_match.get("Base Plan Name", "Unknown Plan")
+        print(
+            f"DEBUG: Found CSV Match! Input: '{plan_name}' -> Matched: '{matched_name}' (Score: {highest_ratio:.2f})"
+        )
         return best_match
-    
+
     return None
+
 
 def parse_date(date_str):
     for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d-%b-%Y", "%d %b %Y"):
@@ -1059,7 +1266,10 @@ def parse_date(date_str):
             continue
     return None
 
-async def generate_content_with_fallback(client, contents, model_list=None, use_schema=False, **kwargs):
+
+async def generate_content_with_fallback(
+    client, contents, model_list=None, use_schema=False, **kwargs
+):
     if model_list is None:
         model_list = MODEL_CANDIDATES
     last_exception = None
@@ -1068,26 +1278,26 @@ async def generate_content_with_fallback(client, contents, model_list=None, use_
             print(f"Attempting model: {model}")
 
             config_params = {"response_mime_type": "application/json"}
-            
+
             # Merge kwargs into config_params (e.g. temperature, response_schema)
             if kwargs:
-                config_params.update(kwargs) # This allows passing temperature=0.0
+                config_params.update(kwargs)  # This allows passing temperature=0.0
 
             if not use_schema and "response_schema" in config_params:
                 config_params.pop("response_schema")
 
             # If tools are provided, we cannot enforce JSON mime_type easily on all models
-            # But the user wants JSON. 
+            # But the user wants JSON.
             if "tools" in config_params:
-                 # If tools are used, mime_type must be removed for some models or handled differently
-                 # ideally we keep tools in config and remove mime_type if it conflicts
-                 config_params.pop("response_mime_type", None)
+                # If tools are used, mime_type must be removed for some models or handled differently
+                # ideally we keep tools in config and remove mime_type if it conflicts
+                config_params.pop("response_mime_type", None)
 
             response = await run_in_threadpool(
                 client.models.generate_content,
                 model=model,
                 contents=contents,
-                config=types.GenerateContentConfig(**config_params)
+                config=types.GenerateContentConfig(**config_params),
             )
             print(f"Success with model: {model}", flush=True)
             return response
@@ -1098,14 +1308,16 @@ async def generate_content_with_fallback(client, contents, model_list=None, use_
     print("All models failed.")
     raise last_exception or Exception("All models failed")
 
+
 def calculate_waiting_period_status(extracted_data, features_found):
     start_date_str = extracted_data.get("policy_details", {}).get("start_date", "")
     start_date = parse_date(start_date_str)
     if not start_date:
         return {}
 
-    months_active = (datetime.now().year - start_date.year) * 12 + \
-                    (datetime.now().month - start_date.month)
+    months_active = (datetime.now().year - start_date.year) * 12 + (
+        datetime.now().month - start_date.month
+    )
 
     def status(wait_months, served):
         if served >= wait_months:
@@ -1113,8 +1325,10 @@ def calculate_waiting_period_status(extracted_data, features_found):
         remaining = wait_months - served
         y, m = divmod(remaining, 12)
         parts = []
-        if y: parts.append(f"{y} year" + ("s" if y > 1 else ""))
-        if m: parts.append(f"{m} month" + ("s" if m > 1 else ""))
+        if y:
+            parts.append(f"{y} year" + ("s" if y > 1 else ""))
+        if m:
+            parts.append(f"{m} month" + ("s" if m > 1 else ""))
         return f"{' '.join(parts)} remaining"
 
     # 1. Initial waiting period (always 30 days)
@@ -1123,80 +1337,108 @@ def calculate_waiting_period_status(extracted_data, features_found):
             "wait_months": 1,
             "served_months": months_active,
             "status": status(1, months_active),
-            "affects": "All new illnesses in first 30 days"
+            "affects": "All new illnesses in first 30 days",
         }
     }
 
     # 2. Specific illness waiting period
     specific_wait = 24
     val = str(features_found.get("Specific Illness Waiting Period", "")).lower()
-    if "1 year" in val or "12 month" in val: specific_wait = 12
-    elif "2 year" in val or "24 month" in val: specific_wait = 24
+    if "1 year" in val or "12 month" in val:
+        specific_wait = 12
+    elif "2 year" in val or "24 month" in val:
+        specific_wait = 24
     statuses["Specific Illness Waiting Period"] = {
         "wait_months": specific_wait,
         "served_months": months_active,
         "status": status(specific_wait, months_active),
-        "affects": "Cataract, Hernia, Joint Replacement, Knee Surgery, Kidney Stones"
+        "affects": "Cataract, Hernia, Joint Replacement, Knee Surgery, Kidney Stones",
     }
 
     # 3. PED waiting period
     ped_wait = 48
     val = str(features_found.get("Coverage of Pre-Existing Diseases", "")).lower()
-    if "2 year" in val: ped_wait = 24
-    elif "3 year" in val: ped_wait = 36
-    elif "4 year" in val: ped_wait = 48
-    elif "day 1" in val or "zero" in val: ped_wait = 0
+    if "2 year" in val:
+        ped_wait = 24
+    elif "3 year" in val:
+        ped_wait = 36
+    elif "4 year" in val:
+        ped_wait = 48
+    elif "day 1" in val or "zero" in val:
+        ped_wait = 0
     statuses["Pre-Existing Disease (PED)"] = {
         "wait_months": ped_wait,
         "served_months": months_active,
         "status": "Day 1 Cover" if ped_wait == 0 else status(ped_wait, months_active),
-        "affects": "Diabetes, Hypertension, Heart Disease, Thyroid, Asthma, PCOD"
+        "affects": "Diabetes, Hypertension, Heart Disease, Thyroid, Asthma, PCOD",
     }
 
     # 4. Maternity waiting period
     mat_wait = 36
     val = str(features_found.get("Maternity", "")).lower()
-    if "9 month" in val: mat_wait = 9
-    elif "1 year" in val: mat_wait = 12
-    elif "2 year" in val: mat_wait = 24
-    elif "3 year" in val: mat_wait = 36
-    elif "4 year" in val: mat_wait = 48
-    elif "not covered" in val or "not available" in val: mat_wait = -1
+    if "9 month" in val:
+        mat_wait = 9
+    elif "1 year" in val:
+        mat_wait = 12
+    elif "2 year" in val:
+        mat_wait = 24
+    elif "3 year" in val:
+        mat_wait = 36
+    elif "4 year" in val:
+        mat_wait = 48
+    elif "not covered" in val or "not available" in val:
+        mat_wait = -1
     statuses["Maternity Cover"] = {
         "wait_months": mat_wait,
         "served_months": months_active,
         "status": "Not Covered" if mat_wait == -1 else status(mat_wait, months_active),
-        "affects": "Normal Delivery, C-Section, Newborn Expenses, Pre/Post Natal"
+        "affects": "Normal Delivery, C-Section, Newborn Expenses, Pre/Post Natal",
     }
 
     return statuses
+
 
 # ---------------------------------------------------------------------------
 # ASYNC JOB WRAPPERS — kick off heavy AI work in background, return job_id
 # ---------------------------------------------------------------------------
 
-async def _run_extract_job(job_id: str, content: bytes, content_type: str, orig_filename: str, user: dict):
+
+async def _run_extract_job(
+    job_id: str, content: bytes, content_type: str, orig_filename: str, user: dict
+):
     try:
         JOB_STORE[job_id]["phase"] = "Running AI analysis (Pass 1 & 2 in parallel)..."
         result = await _extract_policy_core(content, content_type, orig_filename, user)
-        JOB_STORE[job_id].update({"status": "completed", "result": result, "phase": "Done"})
+        JOB_STORE[job_id].update(
+            {"status": "completed", "result": result, "phase": "Done"}
+        )
     except Exception as e:
-        JOB_STORE[job_id].update({"status": "failed", "error": str(e), "phase": "Failed"})
+        JOB_STORE[job_id].update(
+            {"status": "failed", "error": str(e), "phase": "Failed"}
+        )
     finally:
         _cleanup_old_jobs()
+
 
 async def _run_compare_job(job_id: str, data: dict, user: dict):
     try:
         JOB_STORE[job_id]["phase"] = "Generating analysis report..."
         result = await _compare_policy_core(data, user)
-        JOB_STORE[job_id].update({"status": "completed", "result": result, "phase": "Done"})
+        JOB_STORE[job_id].update(
+            {"status": "completed", "result": result, "phase": "Done"}
+        )
     except Exception as e:
-        JOB_STORE[job_id].update({"status": "failed", "error": str(e), "phase": "Failed"})
+        JOB_STORE[job_id].update(
+            {"status": "failed", "error": str(e), "phase": "Failed"}
+        )
     finally:
         _cleanup_old_jobs()
 
+
 @app.post("/api/extract")
-async def extract_policy(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+async def extract_policy(
+    file: UploadFile = File(...), user: dict = Depends(get_current_user)
+):
     """Thin handler: validates file, fires background job, returns job_id immediately."""
     content = await file.read()
     orig_filename = file.filename or "policy.pdf"
@@ -1204,52 +1446,77 @@ async def extract_policy(file: UploadFile = File(...), user: dict = Depends(get_
 
     # Quick validations (synchronous — done before returning job_id)
     if len(content) > MAX_UPLOAD_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE_BYTES / (1024*1024):.1f}MB.")
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE_BYTES / (1024*1024):.1f}MB.",
+        )
     kind = filetype.guess(content)
     allowed_mimes = ["application/pdf", "image/jpeg", "image/png"]
     if kind is None or kind.mime not in allowed_mimes:
-        raise HTTPException(status_code=415, detail="Invalid document format. Only PDF, JPG, and PNG files are accepted.")
+        raise HTTPException(
+            status_code=415,
+            detail="Invalid document format. Only PDF, JPG, and PNG files are accepted.",
+        )
 
     job_id = str(uuid.uuid4())
-    JOB_STORE[job_id] = {"status": "processing", "phase": "Reading document...", "result": None, "error": None, "created_at": time.time()}
-    asyncio.create_task(_run_extract_job(job_id, content, content_type, orig_filename, user))
+    JOB_STORE[job_id] = {
+        "status": "processing",
+        "phase": "Reading document...",
+        "result": None,
+        "error": None,
+        "created_at": time.time(),
+    }
+    asyncio.create_task(
+        _run_extract_job(job_id, content, content_type, orig_filename, user)
+    )
     return {"job_id": job_id}
+
 
 @app.get("/api/job/{job_id}")
 async def get_job_status(job_id: str, user: dict = Depends(get_current_user)):
     """Poll this endpoint to get the status and result of a background job."""
     job = JOB_STORE.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found or expired. Please retry.")
+        raise HTTPException(
+            status_code=404, detail="Job not found or expired. Please retry."
+        )
     return {
-        "status": job["status"],   # "processing" | "completed" | "failed"
-        "phase":  job["phase"],    # human-readable progress message
+        "status": job["status"],  # "processing" | "completed" | "failed"
+        "phase": job["phase"],  # human-readable progress message
         "result": job.get("result"),
-        "error":  job.get("error")
+        "error": job.get("error"),
     }
+
 
 # ---------------------------------------------------------------------------
 # CORE LOGIC (extracted from route handlers — called by background jobs)
 # ---------------------------------------------------------------------------
 
-async def _extract_policy_core(content: bytes, content_type: str, orig_filename: str, user: dict):
+
+async def _extract_policy_core(
+    content: bytes, content_type: str, orig_filename: str, user: dict
+):
     try:
         print(f"\n{'='*40}")
         print("🚀 [JOB] _extract_policy_core STARTED")
         print(f"📁 File: {orig_filename}")
         print(f"{'='*40}\n")
 
-        
         print(f"📦 File Size: {len(content) / 1024:.1f} KB", flush=True)
-        print("✅ Step 1/6: Security validation passed (already done in route handler).", flush=True)
+        print(
+            "✅ Step 1/6: Security validation passed (already done in route handler).",
+            flush=True,
+        )
         # ----------------------------
 
         # Read features CSV for context
         features_csv_content = FEATURES_CSV_CONTENT
         terminologies_csv_content = TERMINOLOGIES_CSV_CONTENT
-        
+
         if not features_csv_content:
-             features_csv_content = "Room Rent, NCB, Restoration, Waiting Periods, Co-pay"
+            features_csv_content = (
+                "Room Rent, NCB, Restoration, Waiting Periods, Co-pay"
+            )
 
         # --- NEW: Filter Features to only match Dataset Columns ---
         # User wants ONLY features present in the dataset to be displayed/extracted.
@@ -1262,29 +1529,32 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                 # Keep header
                 lines = features_csv_content.splitlines()
                 if lines:
-                    filtered_lines.append(lines[0]) 
-                
+                    filtered_lines.append(lines[0])
+
                 f_io = io.StringIO(features_csv_content)
                 reader = csv.reader(f_io)
                 next(reader)  # skip header row
-                
+
                 for row in reader:
-                    if len(row) < 3: continue
+                    if len(row) < 3:
+                        continue
                     category = row[0].strip()
                     feat_name = row[1].strip()
                     feat_name_lower = feat_name.lower()
                     description = row[2].strip()
-                    
+
                     # Strict/Fuzzy Match check
                     matched = False
-                    
+
                     if category in ["Non-Negotiable Benefits", "Must Have"]:
                         matched = True
-                    
+
                     elif feat_name_lower in dataset_features:
                         matched = True
                     else:
-                        matches = difflib.get_close_matches(feat_name_lower, dataset_features, n=1, cutoff=0.7)
+                        matches = difflib.get_close_matches(
+                            feat_name_lower, dataset_features, n=1, cutoff=0.7
+                        )
                         if matches:
                             matched = True
                         else:
@@ -1292,15 +1562,20 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                                 if feat_name_lower in df or df in feat_name_lower:
                                     matched = True
                                     break
-                    
+
                     if matched:
                         # Construct a standardized string: "Term: Description (Category: CategoryName)"
                         # Using a format that's very natural for LLMs to parse contextually
-                        filtered_lines.append(f"- {feat_name}: {description} (Category: {category})")
-                
+                        filtered_lines.append(
+                            f"- {feat_name}: {description} (Category: {category})"
+                        )
+
                 # Update features_csv to only contain filtered list
                 features_csv = "\n".join(filtered_lines)
-                print(f"✅ Step 2/6: Feature list filtered to {len(filtered_lines)} items from dataset.", flush=True)
+                print(
+                    f"✅ Step 2/6: Feature list filtered to {len(filtered_lines)} items from dataset.",
+                    flush=True,
+                )
             else:
                 features_csv = features_csv_content
         except Exception as e:
@@ -1398,55 +1673,73 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
         try:
             # Using Gemini's native PDF bytes handler for much faster processing
             # Bypassing slow Docling local conversion
-            print("\n⚙️  Step 3/6: Sending PDF to Gemini AI (Pass 1 + Pass 2 in parallel)...", flush=True)
-            print("   ├─ Pass 1: Extracting demographics, policy details, sum insured...", flush=True)
-            print("   └─ Pass 2: Scanning for medical features & coverage details...", flush=True)
+            print(
+                "\n⚙️  Step 3/6: Sending PDF to Gemini AI (Pass 1 + Pass 2 in parallel)...",
+                flush=True,
+            )
+            print(
+                "   ├─ Pass 1: Extracting demographics, policy details, sum insured...",
+                flush=True,
+            )
+            print(
+                "   └─ Pass 2: Scanning for medical features & coverage details...",
+                flush=True,
+            )
             part_content = types.Part.from_bytes(data=content, mime_type=content_type)
 
             # Parallel Execution of both prompts
             task1 = generate_content_with_fallback(
-                client, [prompt_1, part_content], 
-                model_list=PASS1_MODELS, 
-                use_schema=True, 
-                response_schema=Pass1Schema, 
-                temperature=0.0
+                client,
+                [prompt_1, part_content],
+                model_list=PASS1_MODELS,
+                use_schema=True,
+                response_schema=Pass1Schema,
+                temperature=0.0,
             )
             task2 = generate_content_with_fallback(
-                client, [prompt_2, part_content], 
-                model_list=PASS2_MODELS, 
-                use_schema=True, 
-                response_schema=Pass2Schema, 
+                client,
+                [prompt_2, part_content],
+                model_list=PASS2_MODELS,
+                use_schema=True,
+                response_schema=Pass2Schema,
                 temperature=0.0,
-                thinking_config=types.ThinkingConfig(thinking_budget=1024)
+                thinking_config=types.ThinkingConfig(thinking_budget=1024),
             )
-            
+
             res1, res2 = await asyncio.gather(task1, task2)
             print("✅ Step 3/6: AI Pass 1 & 2 completed.", flush=True)
-            
+
             # --- Parsing Pass 1 (Demographics) ---
             print("\n🔍 Step 4/6: Parsing AI responses...", flush=True)
             text1 = res1.text.strip()
-            if "```json" in text1: text1 = text1.split("```json")[1].split("```")[0].strip()
-            elif "```" in text1: text1 = text1.split("```")[1].split("```")[0].strip()
+            if "```json" in text1:
+                text1 = text1.split("```json")[1].split("```")[0].strip()
+            elif "```" in text1:
+                text1 = text1.split("```")[1].split("```")[0].strip()
             data_p1 = json.loads(text1, strict=False)
             if isinstance(data_p1, list):
                 data_p1 = data_p1[0] if len(data_p1) > 0 else {}
-            print(f"   ├─ Pass 1 parsed: Company='{data_p1.get('company', '?')}', Plan='{data_p1.get('plan', '?')}'", flush=True)
+            print(
+                f"   ├─ Pass 1 parsed: Company='{data_p1.get('company', '?')}', Plan='{data_p1.get('plan', '?')}'",
+                flush=True,
+            )
 
             # --- Parsing Pass 2 (Features) ---
             text2 = res2.text.strip()
-            if "```json" in text2: text2 = text2.split("```json")[1].split("```")[0].strip()
-            elif "```" in text2: text2 = text2.split("```")[1].split("```")[0].strip()
-            
+            if "```json" in text2:
+                text2 = text2.split("```json")[1].split("```")[0].strip()
+            elif "```" in text2:
+                text2 = text2.split("```")[1].split("```")[0].strip()
+
             raw_p2 = json.loads(text2, strict=False)
             if isinstance(raw_p2, list):
                 raw_p2 = raw_p2[0] if len(raw_p2) > 0 else {}
-                
+
             # Remap Gemini's list of objects back to dict mapping expected by the rest of the application
             data_p2 = {
-                "features_found": {}, 
-                "verbatim_quotes": {}, 
-                "comprehensive_findings": raw_p2.get("comprehensive_findings", "")
+                "features_found": {},
+                "verbatim_quotes": {},
+                "comprehensive_findings": raw_p2.get("comprehensive_findings", ""),
             }
             features_list = raw_p2.get("features", [])
             for feat in features_list:
@@ -1454,11 +1747,17 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                 if fname:
                     data_p2["features_found"][fname] = feat.get("value", "")
                     data_p2["verbatim_quotes"][fname] = feat.get("verbatim_quote", "")
-                    
-            feat_count = len(data_p2.get('features_found', {}))
-            print(f"   └─ Pass 2 parsed: {feat_count} features extracted from document.", flush=True)
-            print("✅ Step 4/6: All responses parsed successfully. (Pass 3 removed for speed optimization)", flush=True)
-            
+
+            feat_count = len(data_p2.get("features_found", {}))
+            print(
+                f"   └─ Pass 2 parsed: {feat_count} features extracted from document.",
+                flush=True,
+            )
+            print(
+                "✅ Step 4/6: All responses parsed successfully. (Pass 3 removed for speed optimization)",
+                flush=True,
+            )
+
             # Merge JSON objects
             data = {**data_p1, **data_p2}
 
@@ -1467,30 +1766,51 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
             try:
                 company_name = data.get("company", "")
                 plan_name = data.get("plan", "")
-                print(f"\n🗄️  Step 6/6: Running fallback — checking database for: '{company_name}' / '{plan_name}'...", flush=True)
+                print(
+                    f"\n🗄️  Step 6/6: Running fallback — checking database for: '{company_name}' / '{plan_name}'...",
+                    flush=True,
+                )
                 if company_name and plan_name and PLANS_DATABASE_CSV_CONTENT:
-                    matched_row = match_policy_in_csv(company_name, plan_name, PLANS_DATABASE_CSV_CONTENT)
+                    matched_row = match_policy_in_csv(
+                        company_name, plan_name, PLANS_DATABASE_CSV_CONTENT
+                    )
                     if matched_row:
-                        print(f"   ✅ Database match found: '{matched_row.get('Base Plan Name')}' — filling gaps...", flush=True)
+                        print(
+                            f"   ✅ Database match found: '{matched_row.get('Base Plan Name')}' — filling gaps...",
+                            flush=True,
+                        )
                         features_found = data.get("features_found", {})
                         verbatim_quotes = data.get("verbatim_quotes", {})
-                        
+
                         # Iterate through dataset columns to see if we can fill gaps
                         for feat_name, feat_val in matched_row.items():
-                            if not feat_name or not feat_val: continue
-                            
+                            if not feat_name or not feat_val:
+                                continue
+
                             # Standardize key (Dataset headers are usually Title Case or snake_case)
                             # AI is instructed to use exact terms from features4.csv
                             key_norm = feat_name.strip()
-                            
+
                             current_val = features_found.get(key_norm)
                             # If AI couldn't find it in PDF, use the database value
-                            if not current_val or current_val == "Not Explicitly Mentioned":
+                            if (
+                                not current_val
+                                or current_val == "Not Explicitly Mentioned"
+                            ):
                                 str_val = str(feat_val).strip()
-                                if str_val and str_val.lower() not in ["nan", "not applicable", "not available", "none"]:
-                                    features_found[key_norm] = f"[From Database] {str_val}"
-                                    verbatim_quotes[key_norm] = f"[From Database] Value retrieved from official {matched_row.get('Insurance Company')} specifications for '{matched_row.get('Base Plan Name')}'."
-                        
+                                if str_val and str_val.lower() not in [
+                                    "nan",
+                                    "not applicable",
+                                    "not available",
+                                    "none",
+                                ]:
+                                    features_found[key_norm] = (
+                                        f"[From Database] {str_val}"
+                                    )
+                                    verbatim_quotes[key_norm] = (
+                                        f"[From Database] Value retrieved from official {matched_row.get('Insurance Company')} specifications for '{matched_row.get('Base Plan Name')}'."
+                                    )
+
                         data["features_found"] = features_found
                         data["verbatim_quotes"] = verbatim_quotes
             except Exception as e:
@@ -1501,50 +1821,57 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
             try:
                 features_found = data.get("features_found", {})
                 verbatim_quotes = data.get("verbatim_quotes", {})
-                
+
                 # Create a map for robust case/plural variation matching
                 ff_lower_map = {k.strip().lower(): k for k in features_found.keys()}
 
                 for feat in COMPULSORY_FEATURES:
                     feat_lower = feat.strip().lower()
-                    
+
                     # 1. Try exact lower match
                     actual_key = ff_lower_map.get(feat_lower)
-                    
+
                     # 2. Try common variations
                     if not actual_key:
                         variations = [
-                            feat_lower.rstrip('s'),
-                            feat_lower + 's',
-                            feat_lower.replace('hospitalisation', 'hospitalization'),
-                            feat_lower.replace('hospitalization', 'hospitalisation')
+                            feat_lower.rstrip("s"),
+                            feat_lower + "s",
+                            feat_lower.replace("hospitalisation", "hospitalization"),
+                            feat_lower.replace("hospitalization", "hospitalisation"),
                         ]
                         for v in variations:
                             if v in ff_lower_map:
                                 actual_key = ff_lower_map[v]
                                 break
-                                
+
                     if not actual_key:
                         actual_key = feat
-                        
+
                     current_val = features_found.get(actual_key)
-                    
-                    if not current_val or str(current_val).strip() == "Not Explicitly Mentioned" or str(current_val).strip() == "N/A":
+
+                    if (
+                        not current_val
+                        or str(current_val).strip() == "Not Explicitly Mentioned"
+                        or str(current_val).strip() == "N/A"
+                    ):
                         features_found[actual_key] = "Standard Cover"
-                        verbatim_quotes[actual_key] = "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies."
-                
+                        verbatim_quotes[actual_key] = (
+                            "This is a standard feature/regulatory right provided by default in all IRDAI-approved health insurance policies."
+                        )
+
                 data["features_found"] = features_found
                 data["verbatim_quotes"] = verbatim_quotes
             except Exception as e:
                 print(f"WARNING: Compulsory Features Fallback failed: {e}")
-            
+
             # --- NEW: WAITING PERIOD STATUS DASHBOARD ---
             try:
                 data["waiting_period_status"] = calculate_waiting_period_status(
-                    data, 
-                    data.get("features_found", {})
+                    data, data.get("features_found", {})
                 )
-                print(f"DEBUG: Calculated Waiting Period Status for {len(data.get('waiting_period_status', {}))} categories.")
+                print(
+                    f"DEBUG: Calculated Waiting Period Status for {len(data.get('waiting_period_status', {}))} categories."
+                )
             except Exception as e:
                 print(f"WARNING: Waiting Period Status calculation failed: {e}")
 
@@ -1552,22 +1879,22 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
             print(f"FAILED TO PARSE JSON in EXTRACT. Error: {e}")
             # Return safe default
             data = {
-               "company": "Unknown", 
-               "plan": "Unknown", 
-               "premium": "0", 
-               "coverage": "0", 
-               "city": "Unknown",
-               "pincode": "Unknown",
-               "policy_details": { "start_date": "", "vintage": "Unknown" },
-               "sum_insured": { "total": "0", "components": [] },
-               "policy_holders": [],
-               "features_found": {},
-               "verbatim_quotes": {},
-               "comprehensive_findings": "Could not extract data."
+                "company": "Unknown",
+                "plan": "Unknown",
+                "premium": "0",
+                "coverage": "0",
+                "city": "Unknown",
+                "pincode": "Unknown",
+                "policy_details": {"start_date": "", "vintage": "Unknown"},
+                "sum_insured": {"total": "0", "components": []},
+                "policy_holders": [],
+                "features_found": {},
+                "verbatim_quotes": {},
+                "comprehensive_findings": "Could not extract data.",
             }
 
         # --- PYTHON SIDE: RECALCULATE AGES PRECISELY ---
-        # The LLM often hallucinates the current year or does bad math. 
+        # The LLM often hallucinates the current year or does bad math.
         # We trust the DOB extraction more than the Age calculation.
         if "policy_holders" in data and isinstance(data["policy_holders"], list):
             today = datetime.now()
@@ -1576,25 +1903,33 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                 if dob_str:
                     # Try to parse DOB
                     dob_date = parse_date(dob_str)
-                    
+
                     if dob_date:
                         # Calculate precise age
-                        age = today.year - dob_date.year - ((today.month, today.day) < (dob_date.month, dob_date.day))
-                        person["age"] = str(age) # Override LLM age
+                        age = (
+                            today.year
+                            - dob_date.year
+                            - (
+                                (today.month, today.day)
+                                < (dob_date.month, dob_date.day)
+                            )
+                        )
+                        person["age"] = str(age)  # Override LLM age
 
         # --- PYTHON SIDE: CALCULATE TOTAL SUM INSURED ---
         if "sum_insured" in data and "components" in data["sum_insured"]:
             components = data["sum_insured"]["components"]
             total_val = 0
-            
+
             def extract_number(val_str):
-                if not val_str: return 0
-                s = str(val_str).strip().replace(',', '')
+                if not val_str:
+                    return 0
+                s = str(val_str).strip().replace(",", "")
                 # Handle decimals: If there's a dot, take only the integer part
-                if '.' in s:
-                    s = s.split('.')[0]
+                if "." in s:
+                    s = s.split(".")[0]
                 # Remove non-digits
-                clean = ''.join(c for c in s if c.isdigit())
+                clean = "".join(c for c in s if c.isdigit())
                 return int(clean) if clean else 0
 
             def format_indian_currency(n):
@@ -1611,26 +1946,36 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                 return ",".join(groups) + "," + last_3
 
             valid_components = []
-            
+
             add_ons_str = str(data.get("add_ons", "")).lower()
-            has_inflation_shield_feature = "inflation" in add_ons_str or "shield" in add_ons_str or "protector" in add_ons_str
-            
+            has_inflation_shield_feature = (
+                "inflation" in add_ons_str
+                or "shield" in add_ons_str
+                or "protector" in add_ons_str
+            )
+
             for comp in components:
                 val = extract_number(comp.get("value", "0"))
                 label = comp.get("label", "").lower()
-                
+
                 if val > 0:
                     # Skip percentages from calculation
                     if "%" in label or "percent" in label:
-                         continue
-                    
+                        continue
+
                     # [NEW] Check for Inflation Shield / Care Shield / Protector
                     # User Rule: Ignore PDF value, calculate standardized 7% per year
                     # FIXED: Removed "bonus super" to ensure No Claim Bonus Super is NOT skipped.
-                    if "inflation" in label or "shield" in label or "protector" in label:
-                         print(f"DEBUG: Detected Inflation Shield Feature '{label}' - Ignoring PDF Value {val}, will recalculate.")
-                         has_inflation_shield_feature = True
-                         continue # Skip adding the PDF value
+                    if (
+                        "inflation" in label
+                        or "shield" in label
+                        or "protector" in label
+                    ):
+                        print(
+                            f"DEBUG: Detected Inflation Shield Feature '{label}' - Ignoring PDF Value {val}, will recalculate."
+                        )
+                        has_inflation_shield_feature = True
+                        continue  # Skip adding the PDF value
 
                     if "deductible" in label:
                         # Deductibles are thresholds, they do not reduce or increase the Sum Insured total.
@@ -1638,50 +1983,57 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                     else:
                         total_val += val
 
-                    comp["value"] = format_indian_currency(val) # Apply Indian Format directly
-                    valid_components.append(comp) # Add only valid components
+                    comp["value"] = format_indian_currency(
+                        val
+                    )  # Apply Indian Format directly
+                    valid_components.append(comp)  # Add only valid components
 
             # Update with filtered list
             data["sum_insured"]["components"] = valid_components
-            
+
             # --- NEW: STANDARDIZED INFLATION SHIELD CALCULATION ---
             if has_inflation_shield_feature:
-                 try:
+                try:
                     # 1. Calculate Tenure
                     years_active = 1
                     pd = data.get("policy_details") or {}
                     start_date_str = pd.get("start_date", "")
                     if start_date_str:
-                         s_date = parse_date(start_date_str)
-                         if s_date:
-                             years_active = datetime.now().year - s_date.year
-                             if years_active < 1: years_active = 1
-                    
+                        s_date = parse_date(start_date_str)
+                        if s_date:
+                            years_active = datetime.now().year - s_date.year
+                            if years_active < 1:
+                                years_active = 1
+
                     # 2. Find Base SI
                     base_si = 0
                     for comp in valid_components:
                         lbl = comp.get("label", "").lower()
                         if "base" in lbl or "sum insured" in lbl:
-                             val_str = comp.get("value", "0")
-                             base_si = extract_number(val_str)
-                             break
-                    
+                            val_str = comp.get("value", "0")
+                            base_si = extract_number(val_str)
+                            break
+
                     if base_si > 0:
                         # 3. Calculate Shield: Base * 7% * Years
-                        inflation_amt = int(base_si * (CURRENT_INFLATION_RATE / 100) * years_active)
-                        
+                        inflation_amt = int(
+                            base_si * (CURRENT_INFLATION_RATE / 100) * years_active
+                        )
+
                         if inflation_amt > 0:
                             shield_component = {
                                 "label": f"Inflation Shield ({CURRENT_INFLATION_RATE}% x {years_active} yrs)",
-                                "value": format_indian_currency(inflation_amt)
+                                "value": format_indian_currency(inflation_amt),
                             }
                             data["sum_insured"]["components"].append(shield_component)
-                            
+
                             # Add to total
                             total_val += inflation_amt
-                            print(f"DEBUG: Calculated Standardized Inflation Shield: {inflation_amt}")
-                 except Exception as e:
-                     print(f"WARNING: Standardized Inflation Shield Calc Failed: {e}")
+                            print(
+                                f"DEBUG: Calculated Standardized Inflation Shield: {inflation_amt}"
+                            )
+                except Exception as e:
+                    print(f"WARNING: Standardized Inflation Shield Calc Failed: {e}")
 
             # FORCE OVERWRITE: Use our calculated total from valid components
             # This fixes the issue where AI's total includes hidden/hallucinated values
@@ -1705,12 +2057,14 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
                     supabase_client.storage.from_("policy_pdfs").upload,
                     file=file_bytes,
                     path=storage_filename,
-                    file_options={"content-type": content_type}
+                    file_options={"content-type": content_type},
                 )
-                
+
                 # Get public URL
-                pdf_url = supabase_client.storage.from_("policy_pdfs").get_public_url(storage_filename)
-                
+                pdf_url = supabase_client.storage.from_("policy_pdfs").get_public_url(
+                    storage_filename
+                )
+
                 # Append to JSON output
                 data["pdf_file_url"] = pdf_url
                 print(f"✅ File uploaded successfully! URL: {pdf_url}")
@@ -1731,77 +2085,109 @@ async def _extract_policy_core(content: bytes, content_type: str, orig_filename:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def generate_admin_summary(policy_data: dict, report_data: dict, user_profile: dict) -> dict:
+
+def generate_admin_summary(
+    policy_data: dict, report_data: dict, user_profile: dict
+) -> dict:
     """Generates a pre-call brief for agents, highlighting flags and talking points."""
     flags = []
-    
+
     company_name = policy_data.get("company", "").lower()
     if any(b in company_name for b in BLACKLISTED_COMPANIES):
         flags.append("🚨 USER IS WITH A BLACKLISTED COMPANY")
-        
+
     family_flags = user_profile.get("family_flags", {})
     if family_flags.get("has_senior"):
         flags.append("⚠️ SENIOR CITIZEN IN FAMILY (Needs separate targeted plan)")
-        
+
     cost_level = user_profile.get("healthcare_cost_level", "")
     if cost_level in ["High", "Very High"]:
-        flags.append(f"💰 HIGH TIER CITY: Recommend High SI ({user_profile.get('recommended_si_range')})")
-        
+        flags.append(
+            f"💰 HIGH TIER CITY: Recommend High SI ({user_profile.get('recommended_si_range')})"
+        )
+
     current_si = policy_data.get("sum_insured", {}).get("total", "Unknown")
     premium = policy_data.get("premium", "Unknown")
     score = report_data.get("product_score", 0)
-    
+
     return {
         "key_flags": flags,
         "talking_points": [
             f"Current Policy Score: {score}/10",
             f"Current SI: {current_si} | Premium: {premium}",
-            f"Key Priorities: {', '.join(user_profile.get('priority_features', []))}"
-        ]
+            f"Key Priorities: {', '.join(user_profile.get('priority_features', []))}",
+        ],
     }
 
-def get_relevant_plans_subset(plans_csv: str, user_profile: dict, current_plan: dict = None, max_plans: int = 15) -> str:
+
+def get_relevant_plans_subset(
+    plans_csv: str, user_profile: dict, current_plan: dict = None, max_plans: int = 15
+) -> str:
     """Filters the huge plans CSV to a smaller subset based on user profile to save LLM tokens."""
     if not plans_csv:
         return ""
-        
+
     try:
         reader = csv.DictReader(io.StringIO(plans_csv))
         headers = reader.fieldnames
-        if not headers: return plans_csv
-        
+        if not headers:
+            return plans_csv
+
         scored_rows = []
         is_senior = user_profile.get("family_flags", {}).get("has_senior", False)
-        is_maternity = user_profile.get("family_flags", {}).get("needs_maternity", False)
-        
-        current_plan_name = current_plan.get("Base Plan Name", "").lower() if current_plan else ""
-        current_company = current_plan.get("Insurance Company", "").lower() if current_plan else ""
-        
+        is_maternity = user_profile.get("family_flags", {}).get(
+            "needs_maternity", False
+        )
+
+        current_plan_name = (
+            current_plan.get("Base Plan Name", "").lower() if current_plan else ""
+        )
+        current_company = (
+            current_plan.get("Insurance Company", "").lower() if current_plan else ""
+        )
+
         for row in reader:
             score = 0
             plan_name = row.get("Base Plan Name", "").lower()
             company = row.get("Insurance Company", "").lower()
-            
+
             if plan_name == current_plan_name and company == current_company:
                 scored_rows.append((100, row))
                 continue
-                
+
             if any(b in company for b in BLACKLISTED_COMPANIES):
                 continue
-                
-            if is_senior and ("senior" in plan_name or "care" in plan_name or "silver" in plan_name or "red carpet" in plan_name):
+
+            if is_senior and (
+                "senior" in plan_name
+                or "care" in plan_name
+                or "silver" in plan_name
+                or "red carpet" in plan_name
+            ):
                 score += 3
-            if is_maternity and ("women" in plan_name or "maternity" in plan_name or "joy" in plan_name):
+            if is_maternity and (
+                "women" in plan_name or "maternity" in plan_name or "joy" in plan_name
+            ):
                 score += 3
-                
-            if any(top in plan_name for top in ["optima", "reassure", "active", "health pre", "care supreme", "elevate"]):
+
+            if any(
+                top in plan_name
+                for top in [
+                    "optima",
+                    "reassure",
+                    "active",
+                    "health pre",
+                    "care supreme",
+                    "elevate",
+                ]
+            ):
                 score += 1
-                
+
             scored_rows.append((score, row))
-            
+
         scored_rows.sort(key=lambda x: x[0], reverse=True)
         top_rows = [r[1] for r in scored_rows[:max_plans]]
-        
+
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=headers)
         writer.writeheader()
@@ -1816,20 +2202,37 @@ def get_relevant_plans_subset(plans_csv: str, user_profile: dict, current_plan: 
 async def compare_policy(data: dict, user: dict = Depends(get_current_user)):
     """Thin handler: fires background compare job, returns job_id immediately."""
     job_id = str(uuid.uuid4())
-    JOB_STORE[job_id] = {"status": "processing", "phase": "Starting analysis...", "result": None, "error": None, "created_at": time.time()}
+    JOB_STORE[job_id] = {
+        "status": "processing",
+        "phase": "Starting analysis...",
+        "result": None,
+        "error": None,
+        "created_at": time.time(),
+    }
     asyncio.create_task(_run_compare_job(job_id, data, user))
     return {"job_id": job_id}
+
 
 async def _compare_policy_core(data: dict, user: dict):
     try:
         print(f"\n{'='*40}")
         print("🚀 [API] /api/compare STARTED")
-        print(f"🔍 Analyzing: {data.get('company', 'Unknown')} - {data.get('plan', 'Unknown')}")
+        print(
+            f"🔍 Analyzing: {data.get('company', 'Unknown')} - {data.get('plan', 'Unknown')}"
+        )
         print(f"{'='*40}\n")
         policy_holders = data.get("policy_holders") or []
-        primary_policy_holder = policy_holders[0] if isinstance(policy_holders, list) and policy_holders else {}
-        primary_policy_holder_age = primary_policy_holder.get("age", 30) if isinstance(primary_policy_holder, dict) else 30
-        
+        primary_policy_holder = (
+            policy_holders[0]
+            if isinstance(policy_holders, list) and policy_holders
+            else {}
+        )
+        primary_policy_holder_age = (
+            primary_policy_holder.get("age", 30)
+            if isinstance(primary_policy_holder, dict)
+            else 30
+        )
+
         # Read features from CSV
         features_csv = FEATURES_CSV_CONTENT
         if not features_csv:
@@ -1838,23 +2241,23 @@ async def _compare_policy_core(data: dict, user: dict):
         # Read Company Tiers from CSV
         company_data_csv = COMPANY_RATIOS_CSV_CONTENT
         if not company_data_csv:
-             print("WARNING: company_performance_ratios.csv content missing")
+            print("WARNING: company_performance_ratios.csv content missing")
 
         # Read Insurance Plans Database
         plans_database_csv = PLANS_DATABASE_CSV_CONTENT
         if not plans_database_csv:
-             print("WARNING: Insurance_plan_dataset.csv content missing")
+            print("WARNING: Insurance_plan_dataset.csv content missing")
 
         # Read USP CSV
         usp_csv = USP_CSV_CONTENT
         if not usp_csv:
-             print("WARNING: USP.csv content missing")
+            print("WARNING: USP.csv content missing")
 
         # Calculate Policy Tenure from Inception Date
-        pd = data.get('policy_details') or {}
-        inception_date_str = pd.get('start_date', '')
+        pd = data.get("policy_details") or {}
+        inception_date_str = pd.get("start_date", "")
         calculated_tenure = "Unknown"
-        
+
         if inception_date_str:
             inception_date = parse_date(inception_date_str)
             if inception_date:
@@ -1870,7 +2273,7 @@ async def _compare_policy_core(data: dict, user: dict):
         # [MODIFIED] Check if company exists in CSV (Robust Fallback Logic)
         company_name = data.get("company", "").lower().strip()
         is_company_known = False
-        
+
         if company_name and company_data_csv:
             # 1. Direct substring check (fast)
             if company_name in company_data_csv.lower():
@@ -1885,24 +2288,34 @@ async def _compare_policy_core(data: dict, user: dict):
                         known_name = row.get("Company Name", "").strip().lower()
                         if known_name and (known_name in company_name):
                             is_company_known = True
-                            print(f"DEBUG: Matched input '{company_name}' with known company '{known_name}'")
+                            print(
+                                f"DEBUG: Matched input '{company_name}' with known company '{known_name}'"
+                            )
                             break
-                        
+
                         # 3. First Word Check (e.g. "Chola" in "Cholamandalam")
                         # Split both by space and check if first token matches
-                        known_first = known_name.split(' ')[0] if known_name else ""
-                        
-                        if known_first and len(known_first) > 3 and known_first in company_name:
-                             # Safe guard: Only if first word is significant (>3 chars)
-                             is_company_known = True
-                             print(f"DEBUG: Fuzzy Matched First Word '{known_first}' in input '{company_name}'")
-                             break
+                        known_first = known_name.split(" ")[0] if known_name else ""
+
+                        if (
+                            known_first
+                            and len(known_first) > 3
+                            and known_first in company_name
+                        ):
+                            # Safe guard: Only if first word is significant (>3 chars)
+                            is_company_known = True
+                            print(
+                                f"DEBUG: Fuzzy Matched First Word '{known_first}' in input '{company_name}'"
+                            )
+                            break
                 except Exception as e:
                     print(f"WARNING: Failed to parse company CSV for matching: {e}")
 
         CSV_FALLBACK_INSTRUCTION = ""
         if not is_company_known:
-            print(f"Company '{company_name}' not found in CSV. Using 'Others' fallback.")
+            print(
+                f"Company '{company_name}' not found in CSV. Using 'Others' fallback."
+            )
             CSV_FALLBACK_INSTRUCTION = """
             **IMPORTANT: The company name is not explicitly found in Reference Data 2.**
             You MUST use the **"Others"** row from "Ref 2 CSV DATA" for the Current Policy Stats.
@@ -1913,13 +2326,23 @@ async def _compare_policy_core(data: dict, user: dict):
             """
 
         # [NEW] Perform Strict Verification against Plan Database
-        input_plan_name = data.get("plan", "") # Plan is explicitly at root of extraction JSON
-        verified_row = match_policy_in_csv(data.get("company", ""), input_plan_name, plans_database_csv)
-        
+        input_plan_name = data.get(
+            "plan", ""
+        )  # Plan is explicitly at root of extraction JSON
+        verified_row = match_policy_in_csv(
+            data.get("company", ""), input_plan_name, plans_database_csv
+        )
+
         VERIFIED_DATA_SECTION = ""
         if verified_row:
             # Format row as a clean string for the LLM
-            row_str = " | ".join([f"{k}: {v}" for k, v in verified_row.items() if v and v != "Not Applicable"])
+            row_str = " | ".join(
+                [
+                    f"{k}: {v}"
+                    for k, v in verified_row.items()
+                    if v and v != "Not Applicable"
+                ]
+            )
             VERIFIED_DATA_SECTION = f"""
             *** VERIFIED DATABASE MATCH FOR CURRENT POLICY ***
             We found an EXACT MATCH for this policy in our database:
@@ -1933,13 +2356,19 @@ async def _compare_policy_core(data: dict, user: dict):
 
         # --- STEP 2: ANALYZE PROFILE & GENERATE COMPARISON ---
         user_profile = analyze_user_profile(data)
-        
+
         # --- PROMPT COMPRESSION: FILTER RELEVANT PLANS ---
-        relevant_plans_subset_csv = get_relevant_plans_subset(plans_database_csv, user_profile, current_plan=verified_row)
+        relevant_plans_subset_csv = get_relevant_plans_subset(
+            plans_database_csv, user_profile, current_plan=verified_row
+        )
 
         # --- PREPARE FEATURE LIST STRING FOR PROMPT ---
         # strictly list the columns we want analyzed
-        feature_list_str = "\n        ".join([f"- {col}" for col in DATASET_COLUMNS]) if DATASET_COLUMNS else "- (All columns in Ref 3)"
+        feature_list_str = (
+            "\n        ".join([f"- {col}" for col in DATASET_COLUMNS])
+            if DATASET_COLUMNS
+            else "- (All columns in Ref 3)"
+        )
 
         # --- NEW: PARSE FEATURES BY CATEGORY FOR COMPARISON ---
         # We need specific lists to force the AI to check ALL of them for the Comparison section
@@ -1948,34 +2377,34 @@ async def _compare_policy_core(data: dict, user: dict):
         mh_features_list = []
         gth_features_list = []
         sf_features_list = []
-        
+
         # Create a lowercase set of dataset columns for fast O(1) matching
         dataset_cols_set = {col.lower().strip() for col in DATASET_COLUMNS}
-        
+
         # Map spelling differences between features3.csv and the dataset columns
         synonyms = [
-            "in patient hospitalization", # maps to in-patient hospitalization
-            "pre & post hospitalization", # maps to pre/post
-            "safe guard",                 # maps to surplus/secure
-            "modern treatment",           # maps to modern treatments
-            "restoration benefit"         # maps to automatic restoration
+            "in patient hospitalization",  # maps to in-patient hospitalization
+            "pre & post hospitalization",  # maps to pre/post
+            "safe guard",  # maps to surplus/secure
+            "modern treatment",  # maps to modern treatments
+            "restoration benefit",  # maps to automatic restoration
         ]
         dataset_cols_set.update(synonyms)
-        
+
         try:
             if FEATURES_CSV_CONTENT:
                 # Simple CSV parsing of the string
                 f_io = io.StringIO(FEATURES_CSV_CONTENT)
                 reader = csv.reader(f_io)
                 next(reader)  # skip header row
-                
+
                 for row in reader:
                     if len(row) >= 3:
                         cat = row[0].strip().lower()
                         feat = row[1].strip()
                         feat_lower = feat.lower()
                         description = row[2].strip()
-                        
+
                         # Only include this feature if it exists in the Insurance_plan_dataset columns
                         if not dataset_cols_set or feat_lower in dataset_cols_set:
                             # Format: "Term: Description" for the prompt
@@ -1988,13 +2417,28 @@ async def _compare_policy_core(data: dict, user: dict):
                                 gth_features_list.append(feature_with_desc)
                             elif "special" in cat:
                                 sf_features_list.append(feature_with_desc)
-                                
-                print(f"DEBUG: Filtered Features List to {len(nn_features_list) + len(mh_features_list) + len(gth_features_list) + len(sf_features_list)} items based on Dataset.")
+
+                print(
+                    f"DEBUG: Filtered Features List to {len(nn_features_list) + len(mh_features_list) + len(gth_features_list) + len(sf_features_list)} items based on Dataset."
+                )
         except Exception as e:
             print(f"Error parsing features for lists: {e}")
             # Fallbacks if parsing fails
-            nn_features_list = ["Infinite Care", "No Sub-limits", "Consumables Cover", "Inflation Protector", "No Claim Bonus", "Restoration Benefit"]
-            mh_features_list = ["Room Rent", "ICU Charges", "Day Care Treatments", "Claim Protector", "Pre & Post Hospitalization"]
+            nn_features_list = [
+                "Infinite Care",
+                "No Sub-limits",
+                "Consumables Cover",
+                "Inflation Protector",
+                "No Claim Bonus",
+                "Restoration Benefit",
+            ]
+            mh_features_list = [
+                "Room Rent",
+                "ICU Charges",
+                "Day Care Treatments",
+                "Claim Protector",
+                "Pre & Post Hospitalization",
+            ]
             gth_features_list = ["Air Ambulance", "OPD Cover", "Wellness Benefits"]
             sf_features_list = ["Maternity", "Robotic Surgery", "Global Cover"]
 
@@ -2388,287 +2832,344 @@ async def _compare_policy_core(data: dict, user: dict):
 
         try:
             response = await generate_content_with_fallback(
-                client,
-                contents=prompt,
-                temperature=0.0 # Deterministic output
+                client, contents=prompt, temperature=0.0  # Deterministic output
             )
 
         except Exception as e:
-             print(f"ALL MODELS FAILED: {e}")
-             raise HTTPException(status_code=429, detail="All AI models are currently busy. Please try again later.")
+            print(f"ALL MODELS FAILED: {e}")
+            raise HTTPException(
+                status_code=429,
+                detail="All AI models are currently busy. Please try again later.",
+            )
 
         text = response.text
         if not text:
             raise ValueError("AI returned empty response")
-        
+
         print(f"DEBUG: AI Raw Text (First 500 chars): {text[:500]}...")
-        
+
         text = text.replace("```json", "").replace("```", "").strip()
         try:
-             result = json.loads(text)
-             # DEBUG: Dump the parsed result
-             with open("debug_result.json", "w") as f:
-                 json.dump(result, f, indent=2)
+            result = json.loads(text)
+            # DEBUG: Dump the parsed result
+            with open("debug_result.json", "w") as f:
+                json.dump(result, f, indent=2)
 
-             # --- DETERMINISTIC FEATURE MAPPING ---
-             # We take the raw dict from AI and stitch it back to the EXACT static categories and explanations from the CSV
-             if "feature_analysis_dict" in result:
-                 feature_dict_raw = result["feature_analysis_dict"]
-                 # Normalize AI keys to lowercase
-                 dict_keys_lower = {k.lower().strip(): v for k, v in feature_dict_raw.items()}
-                 
-                 feature_analysis_array = []
-                 if FEATURES_CSV_CONTENT:
-                     # Parse CSV line by line to keep exact global order and spelling
-                     reader = csv.reader(io.StringIO(FEATURES_CSV_CONTENT))
-                     for row in reader:
-                         # Ensure we only process rows with enough columns
-                         if len(row) >= 3 and row[0].strip().lower() != "category": 
-                             cat = row[0].strip()
-                             feat = row[1].strip()
-                             exp = row[2].strip()
-                             
-                             feat_lower = feat.lower()
-                             
-                             item = None
-                             if feat_lower in dict_keys_lower:
-                                 item = dict_keys_lower[feat_lower]
-                             else:
-                                 # Fuzzy match fallback
-                                 matches = difflib.get_close_matches(feat_lower, dict_keys_lower.keys(), n=1, cutoff=0.8)
-                                 if matches:
-                                     item = dict_keys_lower[matches[0]]
-                             
-                             # If AI evaluated it, append to final array
-                             if item:
-                                 # Safely parse score_weight to float
-                                 score_val = item.get("score_weight", 0.0)
-                                 try:
-                                     score_val = float(score_val)
-                                 except (ValueError, TypeError):
-                                     score_val = 0.0
-                                     
-                                 feature_analysis_array.append({
-                                     "category": cat,
-                                     "feature": feat,
-                                     "explanation": exp,
-                                     "policy_text": item.get("policy_text", "Not Explicitly Mentioned"),
-                                     "status": item.get("status", "Negative"),
-                                     "value": str(item.get("value", "Not Covered")),
-                                     "score_weight": score_val
-                                 })
-                 
-                 # Safely parse and append any dynamically discovered extra features
-                 if "additional_discovered_features" in result and isinstance(result["additional_discovered_features"], list):
-                     for extra_item in result["additional_discovered_features"]:
-                         # Check if all required keys exist to prevent frontend crash
-                         if "name" in extra_item:
-                             
-                             score_val = extra_item.get("score_weight", 0.0)
-                             try:
-                                 score_val = float(score_val)
-                             except (ValueError, TypeError):
-                                 score_val = 0.0
-                                 
-                             feature_analysis_array.append({
-                                 "category": extra_item.get("category", "Special Features"),
-                                 "feature": extra_item["name"],
-                                 "explanation": extra_item.get("explanation", "Extracted intelligently by AI."),
-                                 "policy_text": extra_item.get("policy_text", "Not Explicitly Mentioned"),
-                                 "status": extra_item.get("status", "Positive"),
-                                 "value": str(extra_item.get("value", "Not Covered")),
-                                 "score_weight": score_val
-                             })
-                 
-                 # Assign the perfectly structured array back to the expected key
-                 result["feature_analysis"] = feature_analysis_array
-                 print(f"DEBUG: Stitched Feature Analysis Count: {len(result['feature_analysis'])}")
-                 
-             if "feature_analysis" in result:
-                 # --- DETERMINISTIC SCORE CALCULATION (WEIGHTED) ---
-                 # Calculate score using the fractional `score_weight` (0.0 to 1.0) provided by LLM
-                 try:
-                     features = result.get('feature_analysis', [])
-                     total_evaluated = len(features)
-                     
-                     if total_evaluated > 0:
-                         total_weight = 0.0
-                         for item in features:
-                             # Default to 0 if missing or invalid
-                             try:
-                                 weight = float(item.get("score_weight", 0.0))
-                                 # Cap weight between 0.0 and 1.0 just to be safe
-                                 weight = max(0.0, min(1.0, weight)) 
-                             except (ValueError, TypeError):
-                                 weight = 0.0
-                                 
-                             total_weight += weight
-                             
-                         # Calculate Score: (Sum of Weights / Total Evaluated Features) * 10
-                         calc_score = (total_weight / total_evaluated) * 10
-                         
-                         # Hard Cap at 10 to prevent bug where score > 10
-                         calc_score = min(10.0, calc_score)
-                         
-                         result['product_score'] = round(calc_score, 2)
-                         print(f"DEBUG: Calc Weighted Score: {result['product_score']} (Total Weight: {total_weight}/{total_evaluated})")
-                     else:
-                         result['product_score'] = 0.0
-                         
-                 except Exception as e:
-                     print(f"DEBUG: Score Calculation Failed: {e}")
-                     if 'product_score' not in result:
-                         result['product_score'] = 0.0
+            # --- DETERMINISTIC FEATURE MAPPING ---
+            # We take the raw dict from AI and stitch it back to the EXACT static categories and explanations from the CSV
+            if "feature_analysis_dict" in result:
+                feature_dict_raw = result["feature_analysis_dict"]
+                # Normalize AI keys to lowercase
+                dict_keys_lower = {
+                    k.lower().strip(): v for k, v in feature_dict_raw.items()
+                }
 
-             if "recommendations" in result:
-                 # Standardize Structure: Frontend expects [{ category:..., items: [...] }]
-                 recs = result['recommendations']
-                 
-                 # Case 1: AI returned a flat list of plans directly
-                 if isinstance(recs, list) and len(recs) > 0 and "items" not in recs[0]:
-                     print("DEBUG: Detected Flat List of Recommendations. Wrapping in Category.")
-                     result['recommendations'] = [{
-                         "category": "Recommended Upgrades",
-                         "items": recs
-                     }]
-                 
-                 # Inspect the standardized structure
-                 final_recs = result['recommendations']
-                 
-                 # --- NEW STRICT LIMIT: EXACTLY 3 RECOMMENDATIONS ---
-                 trimmed_recs = []
-                 plans_kept = 0
-                 
-                 for cat in final_recs:
-                     items = cat.get('items', [])
-                     kept_items = []
-                     for plan in items:
-                         if plans_kept >= 3:
-                             break
-                             
-                         c_name = plan.get('company', 'Unknown').lower().strip()
-                         # --- BLACKLIST FILTER ---
-                         if any(blocked in c_name for blocked in BLACKLISTED_COMPANIES):
-                             print(f"DEBUG: Skipped Blacklisted Company: {c_name}")
-                             continue
-                             
-                         kept_items.append(plan)
-                         plans_kept += 1
-                         
-                     if kept_items:
-                         cat['items'] = kept_items
-                         trimmed_recs.append(cat)
-                         
-                     if plans_kept >= 3:
-                         break
-                         
-                 result['recommendations'] = trimmed_recs
-                 final_recs = trimmed_recs
-                 
-                 print(f"DEBUG: Recommendation Categories (Trimmed): {len(final_recs)}")
-                 
-                 total_plans = 0
-                 for cat in final_recs:
-                     items = cat.get('items', [])
-                     total_plans += len(items)
-                     for idx, plan in enumerate(items):
-                         c_name = plan.get('company', 'Unknown').lower().strip()
-                         p_name = plan.get('name', 'Unknown').lower().strip()
-                         
-                         # --- OVERRIDE WITH PRE-CALCULATED SCORES & USP ---
-                         if PLAN_SCORES_DATA:
-                             # 1. subset scores by company to handle same-name plans (e.g. Premier Plan)
-                             # Clean both names extensively for intersect mapping
-                             c_norm = c_name.lower().replace("company", "").replace("co.", "").replace("ltd.", "").replace("ltd", "").replace("general insurance", "").replace("health insurance", "").replace("insurance", "").strip()
-                             candidate_scores = {} 
-                             
-                             for k, v in PLAN_SCORES_DATA.items():
-                                 if "|" in k:
-                                     k_p, k_c = k.split("|") # Format: plan|company
-                                     # Clean target key similarly
-                                     k_c_norm = k_c.lower().replace("general insurance", "").replace("health insurance", "").replace("insurance", "").strip()
-                                     
-                                     # Company Match: Fuzzy containment
-                                     if k_c_norm in c_norm or c_norm in k_c_norm:
-                                         candidate_scores[k_p] = v, k # Store value and full key
-                             
-                             # 2. Match Plan Name within candidates
-                             matched_data = None
-                             matched_p_name = None
-                             
-                             if p_name in candidate_scores:
-                                 matched_data, _ = candidate_scores[p_name]
-                                 matched_p_name = p_name
-                             else:
-                                 # Fuzzy match plan name
-                                 match = difflib.get_close_matches(p_name, candidate_scores.keys(), n=1, cutoff=0.6)
-                                 if match:
-                                     matched_data, _ = candidate_scores[match[0]]
-                                     matched_p_name = match[0]
-                                     print(f"DEBUG: Fuzzy matched '{p_name}' to '{matched_p_name}' for company '{c_name}'")
+                feature_analysis_array = []
+                if FEATURES_CSV_CONTENT:
+                    # Parse CSV line by line to keep exact global order and spelling
+                    reader = csv.reader(io.StringIO(FEATURES_CSV_CONTENT))
+                    for row in reader:
+                        # Ensure we only process rows with enough columns
+                        if len(row) >= 3 and row[0].strip().lower() != "category":
+                            cat = row[0].strip()
+                            feat = row[1].strip()
+                            exp = row[2].strip()
 
-                             if matched_data:
-                                 plan['product_score'] = matched_data['score']
-                                 plan['positive_features_count'] = matched_data['positives']
-                                 plan['total_features_count'] = matched_data['total']
-                                 
-                                 # Update p_name for USP lookup
-                                 # Need to reconstruct the composite key for USP lookup if USP data also uses composite keys?
-                                 # Yes, PLAN_USP_DATA now uses composite keys too.
-                                 
-                                 # Let's try to find USP using the same composite key logic
-                                 # We can't just set p_name = matched_p_name because USP lookup needs company too.
-                                 
-                                 # --- USP OVERRIDE ---
-                                 # PLAN_USP_DATA keys are also "plan|company"
-                                 # We can try to construct the key using the matched plan name and the matched company from score data?
-                                 # Value in candidate_scores was (v, k). k is the full key "plan|company"
-                                 
-                                 _, full_key = candidate_scores[matched_p_name]
-                                 
-                                 if full_key in PLAN_USP_DATA:
-                                     usp = PLAN_USP_DATA[full_key]
-                                     if not usp.lower().startswith("usp"):
-                                         plan['description'] = f"USP: {usp}"
-                                     else:
-                                         plan['description'] = usp
-                                     print(f"DEBUG: Injected USP for {full_key}")
+                            feat_lower = feat.lower()
 
+                            item = None
+                            if feat_lower in dict_keys_lower:
+                                item = dict_keys_lower[feat_lower]
+                            else:
+                                # Fuzzy match fallback
+                                matches = difflib.get_close_matches(
+                                    feat_lower, dict_keys_lower.keys(), n=1, cutoff=0.8
+                                )
+                                if matches:
+                                    item = dict_keys_lower[matches[0]]
 
-                         # (USP injection handled above in score block)
+                            # If AI evaluated it, append to final array
+                            if item:
+                                # Safely parse score_weight to float
+                                score_val = item.get("score_weight", 0.0)
+                                try:
+                                    score_val = float(score_val)
+                                except (ValueError, TypeError):
+                                    score_val = 0.0
 
-                         # Get values for display
-                         feat_count = plan.get('positive_features_count', 0)
-                         total_count = plan.get('total_features_count', 30) # Default to ~30 if not found
-                         calc_score = plan.get('product_score', 0)
-                             
-                         print(f"DEBUG: Plan {idx+1} ({c_name}): Positive Features = {feat_count}/{total_count} --> Score = {calc_score}/10")
+                                feature_analysis_array.append(
+                                    {
+                                        "category": cat,
+                                        "feature": feat,
+                                        "explanation": exp,
+                                        "policy_text": item.get(
+                                            "policy_text", "Not Explicitly Mentioned"
+                                        ),
+                                        "status": item.get("status", "Negative"),
+                                        "value": str(item.get("value", "Not Covered")),
+                                        "score_weight": score_val,
+                                    }
+                                )
 
-                 print(f"DEBUG: Total Recommended Plans Found: {total_plans}")
+                # Safely parse and append any dynamically discovered extra features
+                if "additional_discovered_features" in result and isinstance(
+                    result["additional_discovered_features"], list
+                ):
+                    for extra_item in result["additional_discovered_features"]:
+                        # Check if all required keys exist to prevent frontend crash
+                        if "name" in extra_item:
+
+                            score_val = extra_item.get("score_weight", 0.0)
+                            try:
+                                score_val = float(score_val)
+                            except (ValueError, TypeError):
+                                score_val = 0.0
+
+                            feature_analysis_array.append(
+                                {
+                                    "category": extra_item.get(
+                                        "category", "Special Features"
+                                    ),
+                                    "feature": extra_item["name"],
+                                    "explanation": extra_item.get(
+                                        "explanation", "Extracted intelligently by AI."
+                                    ),
+                                    "policy_text": extra_item.get(
+                                        "policy_text", "Not Explicitly Mentioned"
+                                    ),
+                                    "status": extra_item.get("status", "Positive"),
+                                    "value": str(
+                                        extra_item.get("value", "Not Covered")
+                                    ),
+                                    "score_weight": score_val,
+                                }
+                            )
+
+                # Assign the perfectly structured array back to the expected key
+                result["feature_analysis"] = feature_analysis_array
+                print(
+                    f"DEBUG: Stitched Feature Analysis Count: {len(result['feature_analysis'])}"
+                )
+
+            if "feature_analysis" in result:
+                # --- DETERMINISTIC SCORE CALCULATION (WEIGHTED) ---
+                # Calculate score using the fractional `score_weight` (0.0 to 1.0) provided by LLM
+                try:
+                    features = result.get("feature_analysis", [])
+                    total_evaluated = len(features)
+
+                    if total_evaluated > 0:
+                        total_weight = 0.0
+                        for item in features:
+                            # Default to 0 if missing or invalid
+                            try:
+                                weight = float(item.get("score_weight", 0.0))
+                                # Cap weight between 0.0 and 1.0 just to be safe
+                                weight = max(0.0, min(1.0, weight))
+                            except (ValueError, TypeError):
+                                weight = 0.0
+
+                            total_weight += weight
+
+                        # Calculate Score: (Sum of Weights / Total Evaluated Features) * 10
+                        calc_score = (total_weight / total_evaluated) * 10
+
+                        # Hard Cap at 10 to prevent bug where score > 10
+                        calc_score = min(10.0, calc_score)
+
+                        result["product_score"] = round(calc_score, 2)
+                        print(
+                            f"DEBUG: Calc Weighted Score: {result['product_score']} (Total Weight: {total_weight}/{total_evaluated})"
+                        )
+                    else:
+                        result["product_score"] = 0.0
+
+                except Exception as e:
+                    print(f"DEBUG: Score Calculation Failed: {e}")
+                    if "product_score" not in result:
+                        result["product_score"] = 0.0
+
+            if "recommendations" in result:
+                # Standardize Structure: Frontend expects [{ category:..., items: [...] }]
+                recs = result["recommendations"]
+
+                # Case 1: AI returned a flat list of plans directly
+                if isinstance(recs, list) and len(recs) > 0 and "items" not in recs[0]:
+                    print(
+                        "DEBUG: Detected Flat List of Recommendations. Wrapping in Category."
+                    )
+                    result["recommendations"] = [
+                        {"category": "Recommended Upgrades", "items": recs}
+                    ]
+
+                # Inspect the standardized structure
+                final_recs = result["recommendations"]
+
+                # --- NEW STRICT LIMIT: EXACTLY 3 RECOMMENDATIONS ---
+                trimmed_recs = []
+                plans_kept = 0
+
+                for cat in final_recs:
+                    items = cat.get("items", [])
+                    kept_items = []
+                    for plan in items:
+                        if plans_kept >= 3:
+                            break
+
+                        c_name = plan.get("company", "Unknown").lower().strip()
+                        # --- BLACKLIST FILTER ---
+                        if any(blocked in c_name for blocked in BLACKLISTED_COMPANIES):
+                            print(f"DEBUG: Skipped Blacklisted Company: {c_name}")
+                            continue
+
+                        kept_items.append(plan)
+                        plans_kept += 1
+
+                    if kept_items:
+                        cat["items"] = kept_items
+                        trimmed_recs.append(cat)
+
+                    if plans_kept >= 3:
+                        break
+
+                result["recommendations"] = trimmed_recs
+                final_recs = trimmed_recs
+
+                print(f"DEBUG: Recommendation Categories (Trimmed): {len(final_recs)}")
+
+                total_plans = 0
+                for cat in final_recs:
+                    items = cat.get("items", [])
+                    total_plans += len(items)
+                    for idx, plan in enumerate(items):
+                        c_name = plan.get("company", "Unknown").lower().strip()
+                        p_name = plan.get("name", "Unknown").lower().strip()
+
+                        # --- OVERRIDE WITH PRE-CALCULATED SCORES & USP ---
+                        if PLAN_SCORES_DATA:
+                            # 1. subset scores by company to handle same-name plans (e.g. Premier Plan)
+                            # Clean both names extensively for intersect mapping
+                            c_norm = (
+                                c_name.lower()
+                                .replace("company", "")
+                                .replace("co.", "")
+                                .replace("ltd.", "")
+                                .replace("ltd", "")
+                                .replace("general insurance", "")
+                                .replace("health insurance", "")
+                                .replace("insurance", "")
+                                .strip()
+                            )
+                            candidate_scores = {}
+
+                            for k, v in PLAN_SCORES_DATA.items():
+                                if "|" in k:
+                                    k_p, k_c = k.split("|")  # Format: plan|company
+                                    # Clean target key similarly
+                                    k_c_norm = (
+                                        k_c.lower()
+                                        .replace("general insurance", "")
+                                        .replace("health insurance", "")
+                                        .replace("insurance", "")
+                                        .strip()
+                                    )
+
+                                    # Company Match: Fuzzy containment
+                                    if k_c_norm in c_norm or c_norm in k_c_norm:
+                                        candidate_scores[k_p] = (
+                                            v,
+                                            k,
+                                        )  # Store value and full key
+
+                            # 2. Match Plan Name within candidates
+                            matched_data = None
+                            matched_p_name = None
+
+                            if p_name in candidate_scores:
+                                matched_data, _ = candidate_scores[p_name]
+                                matched_p_name = p_name
+                            else:
+                                # Fuzzy match plan name
+                                match = difflib.get_close_matches(
+                                    p_name, candidate_scores.keys(), n=1, cutoff=0.6
+                                )
+                                if match:
+                                    matched_data, _ = candidate_scores[match[0]]
+                                    matched_p_name = match[0]
+                                    print(
+                                        f"DEBUG: Fuzzy matched '{p_name}' to '{matched_p_name}' for company '{c_name}'"
+                                    )
+
+                            if matched_data:
+                                plan["product_score"] = matched_data["score"]
+                                plan["positive_features_count"] = matched_data[
+                                    "positives"
+                                ]
+                                plan["total_features_count"] = matched_data["total"]
+
+                                # Update p_name for USP lookup
+                                # Need to reconstruct the composite key for USP lookup if USP data also uses composite keys?
+                                # Yes, PLAN_USP_DATA now uses composite keys too.
+
+                                # Let's try to find USP using the same composite key logic
+                                # We can't just set p_name = matched_p_name because USP lookup needs company too.
+
+                                # --- USP OVERRIDE ---
+                                # PLAN_USP_DATA keys are also "plan|company"
+                                # We can try to construct the key using the matched plan name and the matched company from score data?
+                                # Value in candidate_scores was (v, k). k is the full key "plan|company"
+
+                                _, full_key = candidate_scores[matched_p_name]
+
+                                if full_key in PLAN_USP_DATA:
+                                    usp = PLAN_USP_DATA[full_key]
+                                    if not usp.lower().startswith("usp"):
+                                        plan["description"] = f"USP: {usp}"
+                                    else:
+                                        plan["description"] = usp
+                                    print(f"DEBUG: Injected USP for {full_key}")
+
+                        # (USP injection handled above in score block)
+
+                        # Get values for display
+                        feat_count = plan.get("positive_features_count", 0)
+                        total_count = plan.get(
+                            "total_features_count", 30
+                        )  # Default to ~30 if not found
+                        calc_score = plan.get("product_score", 0)
+
+                        print(
+                            f"DEBUG: Plan {idx+1} ({c_name}): Positive Features = {feat_count}/{total_count} --> Score = {calc_score}/10"
+                        )
+
+                print(f"DEBUG: Total Recommended Plans Found: {total_plans}")
 
         except json.JSONDecodeError:
-             # Fallback: Find the first { and last }
-             try:
-                 start = text.find("{")
-                 end = text.rfind("}") + 1
-                 if start != -1 and end != -1:
-                     result = json.loads(text[start:end])
-                 else:
-                     raise ValueError("No JSON found in text")
-             except Exception:
-                 print(f"FAILED TO PARSE JSON. Raw text: {text}")
-                 # Return a safe default object to prevent crash
-                 result = {
+            # Fallback: Find the first { and last }
+            try:
+                start = text.find("{")
+                end = text.rfind("}") + 1
+                if start != -1 and end != -1:
+                    result = json.loads(text[start:end])
+                else:
+                    raise ValueError("No JSON found in text")
+            except Exception:
+                print(f"FAILED TO PARSE JSON. Raw text: {text}")
+                # Return a safe default object to prevent crash
+                result = {
                     "pros": ["Could not analyze policy details."],
                     "cons": ["AI response was not in expected format."],
                     "current_policy_stats": {
                         "company": data.get("company", "Unknown"),
-                        "csr": "N/A", "csr_rank": "N/A",
-                        "solvency": "N/A", "solvency_rank": "N/A",
-                        "complaints": "N/A", "complaints_rank": "N/A"
+                        "csr": "N/A",
+                        "csr_rank": "N/A",
+                        "solvency": "N/A",
+                        "solvency_rank": "N/A",
+                        "complaints": "N/A",
+                        "complaints_rank": "N/A",
                     },
-                    "recommendations": []
-                 }
+                    "recommendations": [],
+                }
 
         # Limit pros/cons to a clean display length (no artificial suppression)
         if "pros" in result and "cons" in result:
@@ -2691,7 +3192,9 @@ async def _compare_policy_core(data: dict, user: dict):
             for comp in si_components:
                 label = str(comp.get("label", "")).lower()
                 val_str = str(comp.get("value", "0")).replace(",", "")
-                val = float(''.join(c for c in val_str if c.isdigit() or c == '.') or "0")
+                val = float(
+                    "".join(c for c in val_str if c.isdigit() or c == ".") or "0"
+                )
                 if val > 0:
                     has_components = True
                     if "deductible" in label or "co-pay" in label or "copay" in label:
@@ -2703,8 +3206,12 @@ async def _compare_policy_core(data: dict, user: dict):
                 si_numeric = int(additive_total - subtractive_total)
             else:
                 # Fallback: parse the raw total string
-                si_raw = str(data.get("sum_insured", {}).get("total", "0")).replace(",", "").strip()
-                si_numeric = int(''.join(c for c in si_raw if c.isdigit()) or "0")
+                si_raw = (
+                    str(data.get("sum_insured", {}).get("total", "0"))
+                    .replace(",", "")
+                    .strip()
+                )
+                si_numeric = int("".join(c for c in si_raw if c.isdigit()) or "0")
         except Exception:
             si_numeric = 0
 
@@ -2713,49 +3220,98 @@ async def _compare_policy_core(data: dict, user: dict):
         HIGH_SI_THRESHOLD = 5_000_000  # 50 Lakhs
         if si_numeric >= HIGH_SI_THRESHOLD:
             GOOD_COVERAGE_THRESHOLD = 7.0  # Relaxed: big SI = already well-protected
-            print(f"DEBUG: SI={si_numeric} >= {HIGH_SI_THRESHOLD} (50L) → Using relaxed threshold 7.0")
+            print(
+                f"DEBUG: SI={si_numeric} >= {HIGH_SI_THRESHOLD} (50L) → Using relaxed threshold 7.0"
+            )
         else:
             GOOD_COVERAGE_THRESHOLD = 7.5  # Standard threshold
-            print(f"DEBUG: SI={si_numeric} < {HIGH_SI_THRESHOLD} (50L) → Using standard threshold 7.5")
+            print(
+                f"DEBUG: SI={si_numeric} < {HIGH_SI_THRESHOLD} (50L) → Using standard threshold 7.5"
+            )
 
         if current_score >= GOOD_COVERAGE_THRESHOLD:
             result["coverage_verdict"] = "good"
-            result["recommendations"] = []  # Clear recommendations for well-covered plans
-            print(f"DEBUG: Score {current_score} >= {GOOD_COVERAGE_THRESHOLD} → coverage_verdict='good', recommendations suppressed.")
+            result["recommendations"] = (
+                []
+            )  # Clear recommendations for well-covered plans
+            print(
+                f"DEBUG: Score {current_score} >= {GOOD_COVERAGE_THRESHOLD} → coverage_verdict='good', recommendations suppressed."
+            )
         else:
             result["coverage_verdict"] = "needs_improvement"
-            print(f"DEBUG: Score {current_score} < {GOOD_COVERAGE_THRESHOLD} → coverage_verdict='needs_improvement', recommendations shown.")
+            print(
+                f"DEBUG: Score {current_score} < {GOOD_COVERAGE_THRESHOLD} → coverage_verdict='needs_improvement', recommendations shown."
+            )
 
         try:
             company_stats_map = {}
             # Load CSR data
             try:
-                with open("company_performance_ratios.csv", "r", encoding="utf-8", errors="replace") as f:
+                with open(
+                    "company_performance_ratios.csv",
+                    "r",
+                    encoding="utf-8",
+                    errors="replace",
+                ) as f:
                     reader = csv.reader(f)
-                    next(reader) # Header 1
-                    next(reader) # Header 2
+                    next(reader)  # Header 1
+                    next(reader)  # Header 2
                     for row in reader:
-                        if len(row) > 15: # Ensure row has all columns
+                        if len(row) > 15:  # Ensure row has all columns
                             # Clean name: remove special chars, lowercase
-                            name_key = row[0].strip().lower().replace("company", "").replace("co.", "").replace("ltd.", "").replace("ltd", "").replace("general insurance", "").replace("health insurance", "").replace("insurance", "").strip()
+                            name_key = (
+                                row[0]
+                                .strip()
+                                .lower()
+                                .replace("company", "")
+                                .replace("co.", "")
+                                .replace("ltd.", "")
+                                .replace("ltd", "")
+                                .replace("general insurance", "")
+                                .replace("health insurance", "")
+                                .replace("insurance", "")
+                                .strip()
+                            )
                             try:
                                 company_stats_map[name_key] = {
                                     "csr": row[1].strip(),
-                                    "csr_rank": row[2].strip() if row[2].strip() else "N/A",
-                                    "complaints": row[8].strip() if row[8].strip() else "N/A",
-                                    "complaints_rank": row[9].strip() if row[9].strip() else "N/A",
-                                    "solvency": row[14].strip() if row[14].strip() else "N/A",
-                                    "solvency_rank": row[15].strip() if row[15].strip() else "N/A",
+                                    "csr_rank": (
+                                        row[2].strip() if row[2].strip() else "N/A"
+                                    ),
+                                    "complaints": (
+                                        row[8].strip() if row[8].strip() else "N/A"
+                                    ),
+                                    "complaints_rank": (
+                                        row[9].strip() if row[9].strip() else "N/A"
+                                    ),
+                                    "solvency": (
+                                        row[14].strip() if row[14].strip() else "N/A"
+                                    ),
+                                    "solvency_rank": (
+                                        row[15].strip() if row[15].strip() else "N/A"
+                                    ),
                                 }
                             except:
                                 pass
-            except: 
+            except:
                 pass
 
             # Update current policy stats from CSV directly
             if "current_policy_stats" in result:
-                current_comp = result["current_policy_stats"].get("company", data.get("company", "")).lower().replace("company", "").replace("co.", "").replace("ltd.", "").replace("ltd", "").replace("general insurance", "").replace("health insurance", "").replace("insurance", "").strip()
-                
+                current_comp = (
+                    result["current_policy_stats"]
+                    .get("company", data.get("company", ""))
+                    .lower()
+                    .replace("company", "")
+                    .replace("co.", "")
+                    .replace("ltd.", "")
+                    .replace("ltd", "")
+                    .replace("general insurance", "")
+                    .replace("health insurance", "")
+                    .replace("insurance", "")
+                    .strip()
+                )
+
                 matched_current = None
                 if current_comp in company_stats_map:
                     matched_current = company_stats_map[current_comp]
@@ -2763,31 +3319,58 @@ async def _compare_policy_core(data: dict, user: dict):
                     c_name_no_spaces = current_comp.replace(" ", "")
                     # Special override for strict matching "Care"
                     if c_name_no_spaces == "care" and "carehealth" in company_stats_map:
-                         matched_current = company_stats_map["carehealth"]
-                    elif c_name_no_spaces == "carehealth" and "carehealth" in company_stats_map:
-                         matched_current = company_stats_map["carehealth"]
+                        matched_current = company_stats_map["carehealth"]
+                    elif (
+                        c_name_no_spaces == "carehealth"
+                        and "carehealth" in company_stats_map
+                    ):
+                        matched_current = company_stats_map["carehealth"]
                     else:
                         for k, v in company_stats_map.items():
                             k_no_spaces = k.replace(" ", "")
-                            if len(k_no_spaces) > 3 and (k_no_spaces in c_name_no_spaces or c_name_no_spaces in k_no_spaces):
+                            if len(k_no_spaces) > 3 and (
+                                k_no_spaces in c_name_no_spaces
+                                or c_name_no_spaces in k_no_spaces
+                            ):
                                 matched_current = v
                                 break
-                                
+
                 if matched_current:
                     result["current_policy_stats"]["csr"] = matched_current["csr"]
-                    result["current_policy_stats"]["csr_rank"] = matched_current["csr_rank"]
-                    result["current_policy_stats"]["solvency"] = matched_current["solvency"]
-                    result["current_policy_stats"]["solvency_rank"] = matched_current["solvency_rank"]
-                    result["current_policy_stats"]["complaints"] = matched_current["complaints"]
-                    result["current_policy_stats"]["complaints_rank"] = matched_current["complaints_rank"]
+                    result["current_policy_stats"]["csr_rank"] = matched_current[
+                        "csr_rank"
+                    ]
+                    result["current_policy_stats"]["solvency"] = matched_current[
+                        "solvency"
+                    ]
+                    result["current_policy_stats"]["solvency_rank"] = matched_current[
+                        "solvency_rank"
+                    ]
+                    result["current_policy_stats"]["complaints"] = matched_current[
+                        "complaints"
+                    ]
+                    result["current_policy_stats"]["complaints_rank"] = matched_current[
+                        "complaints_rank"
+                    ]
 
             if "recommendations" in result:
                 # Iterate each category and inject stats per item
                 for cat in result["recommendations"]:
                     if "items" in cat:
                         for rec in cat["items"]:
-                            c_name = rec.get("company", "").lower().replace("company", "").replace("co.", "").replace("ltd.", "").replace("ltd", "").replace("general insurance", "").replace("health insurance", "").replace("insurance", "").strip()
-                            
+                            c_name = (
+                                rec.get("company", "")
+                                .lower()
+                                .replace("company", "")
+                                .replace("co.", "")
+                                .replace("ltd.", "")
+                                .replace("ltd", "")
+                                .replace("general insurance", "")
+                                .replace("health insurance", "")
+                                .replace("insurance", "")
+                                .strip()
+                            )
+
                             # Find matched stats
                             matched_stats = None
                             # Try exact match
@@ -2798,21 +3381,27 @@ async def _compare_policy_core(data: dict, user: dict):
                                 c_name_no_spaces = c_name.replace(" ", "")
                                 for k, v in company_stats_map.items():
                                     k_no_spaces = k.replace(" ", "")
-                                    if k_no_spaces in c_name_no_spaces or c_name_no_spaces in k_no_spaces:
+                                    if (
+                                        k_no_spaces in c_name_no_spaces
+                                        or c_name_no_spaces in k_no_spaces
+                                    ):
                                         matched_stats = v
                                         break
-                                        
+
                             if matched_stats:
                                 rec["stats"] = matched_stats
                             else:
                                 rec["stats"] = {
-                                    "csr": "N/A", "csr_rank": "-", 
-                                    "solvency": "N/A", "solvency_rank": "-", 
-                                    "complaints": "N/A", "complaints_rank": "-"
+                                    "csr": "N/A",
+                                    "csr_rank": "-",
+                                    "solvency": "N/A",
+                                    "solvency_rank": "-",
+                                    "complaints": "N/A",
+                                    "complaints_rank": "-",
                                 }
 
         except Exception as e:
-             print(f"Sorting Error: {e}") 
+            print(f"Sorting Error: {e}")
 
         # --- SUPABASE DATABASE INSERT ---
         if user and supabase_client:
@@ -2821,52 +3410,61 @@ async def _compare_policy_core(data: dict, user: dict):
                 user_id = profile["id"]
 
                 print("💾 Saving complete Analysis Report to Supabase Database...")
-                
+
                 # --- NEW: Generate Admin Summary ---
                 admin_summary = generate_admin_summary(data, result, user_profile)
                 result["admin_summary"] = admin_summary
-                
+
                 insert_data = {
                     "user_id": user_id,
                     "company_name": data.get("company", "Unknown"),
                     "plan_name": data.get("plan", "Unknown"),
-                    "extracted_data": data, # The original extracted policy data
-                    "report_data": result,   # The newly generated report including admin summary
-                    "pdf_file_url": data.get("pdf_file_url")
+                    "extracted_data": data,  # The original extracted policy data
+                    "report_data": result,  # The newly generated report including admin summary
+                    "pdf_file_url": data.get("pdf_file_url"),
                 }
-                db_res = supabase_client.table("policy_analyses").insert(insert_data).execute()
-                
+                db_res = (
+                    supabase_client.table("policy_analyses")
+                    .insert(insert_data)
+                    .execute()
+                )
+
                 # Attach the DB insert ID to the result so the frontend can use it for chats
                 if db_res.data and len(db_res.data) > 0:
                     result["db_analysis_id"] = db_res.data[0].get("id")
-                    print(f"✅ Analysis saved successfully! Database ID: {result['db_analysis_id']}")
-                    
+                    print(
+                        f"✅ Analysis saved successfully! Database ID: {result['db_analysis_id']}"
+                    )
+
             except Exception as e:
                 print(f"❌ Supabase DB Insert Error: {e}")
                 # Don't fail the request if DB insert fails
 
         print("\n✅ [API] /api/compare COMPLETED SUCCESSFULLY!\n")
-        return result # Changed from res_json to result to match existing variable name
+        return result  # Changed from res_json to result to match existing variable name
     except HTTPException as he:
         raise he
     except Exception as e:
         print(f"COMPARISON ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 def build_chat_context(policy_data: dict, report_data: dict) -> str:
     """Creates a compressed summary of policy data for the chatbot's system prompt."""
-    
+
     # 1. Compress Policy Data (skip huge verbatim quotes and redundant info)
     features = policy_data.get("features_found", {})
-    clean_features = {k: v for k, v in features.items() if str(v) != "Not Explicitly Mentioned"}
-    
+    clean_features = {
+        k: v for k, v in features.items() if str(v) != "Not Explicitly Mentioned"
+    }
+
     summary_policy = {
         "company": policy_data.get("company"),
         "plan": policy_data.get("plan"),
         "sum_insured": policy_data.get("sum_insured", {}).get("total", "Unknown"),
         "premium": policy_data.get("premium", "Unknown"),
         "key_features": clean_features,
-        "waiting_periods": policy_data.get("waiting_period_status", {})
+        "waiting_periods": policy_data.get("waiting_period_status", {}),
     }
 
     # 2. Compress Report Data (extract just the final stats and recommendations)
@@ -2874,18 +3472,20 @@ def build_chat_context(policy_data: dict, report_data: dict) -> str:
         "product_score": report_data.get("product_score", 0),
         "pros": report_data.get("pros", []),
         "cons": report_data.get("cons", []),
-        "recommendations": []
+        "recommendations": [],
     }
-    
+
     for cat in report_data.get("recommendations", []):
         cat_info = {"category": cat.get("category"), "options": []}
         for item in cat.get("items", []):
-             cat_info["options"].append({
-                 "company": item.get("company"),
-                 "plan": item.get("name"),
-                 "premium": item.get("premium"),
-                 "primary_reason": item.get("description"),
-             })
+            cat_info["options"].append(
+                {
+                    "company": item.get("company"),
+                    "plan": item.get("name"),
+                    "premium": item.get("premium"),
+                    "primary_reason": item.get("description"),
+                }
+            )
         summary_report["recommendations"].append(cat_info)
 
     return f"===== COMPRESSED POLICY SUMMARY =====\n{json.dumps(summary_policy, indent=2)}\n\n===== COMPRESSED REPORT SUMMARY =====\n{json.dumps(summary_report, indent=2)}"
@@ -2918,11 +3518,19 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
             if not analysis:
                 raise HTTPException(status_code=404, detail="Analysis not found")
             if not is_analysis_access_allowed(profile_for_chat, analysis):
-                raise HTTPException(status_code=403, detail="Not authorized to chat on this analysis")
+                raise HTTPException(
+                    status_code=403, detail="Not authorized to chat on this analysis"
+                )
 
         if analysis_id and (not policy_data or not report_data):
             try:
-                res = supabase_client.table("policy_analyses").select("extracted_data, report_data").eq("id", analysis_id).single().execute()
+                res = (
+                    supabase_client.table("policy_analyses")
+                    .select("extracted_data, report_data")
+                    .eq("id", analysis_id)
+                    .single()
+                    .execute()
+                )
                 if res.data:
                     policy_data = policy_data or res.data.get("extracted_data", {})
                     report_data = report_data or res.data.get("report_data", {})
@@ -2954,27 +3562,33 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
 
         # Construct Chat History for Gemini API
         contents = [system_context]
-        
+
         # Append previous conversation history
         for msg in chat_history:
-             role = "user" if msg.get("role") == "user" else "model"
-             contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.get("text", ""))]))
-             
+            role = "user" if msg.get("role") == "user" else "model"
+            contents.append(
+                types.Content(
+                    role=role, parts=[types.Part.from_text(text=msg.get("text", ""))]
+                )
+            )
+
         # Add the latest user message
-        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=user_message)]))
+        contents.append(
+            types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
+        )
 
         try:
-             # We can use a slightly more conversational model for chat, but sticking to candidates is safer.
-             # We won't strictly enforce json response here.
-             response = await generate_content_with_fallback(
-                 client,
-                 contents=contents,
-                 temperature=0.4,
-                 response_mime_type="text/plain"
-             )
-             
-             reply_text = response.text.strip()
-             
+            # We can use a slightly more conversational model for chat, but sticking to candidates is safer.
+            # We won't strictly enforce json response here.
+            response = await generate_content_with_fallback(
+                client,
+                contents=contents,
+                temperature=0.4,
+                response_mime_type="text/plain",
+            )
+
+            reply_text = response.text.strip()
+
         except Exception as e:
             reply_text = f"An error occurred while generating the response: {str(e)}"
 
@@ -2984,9 +3598,11 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
 
         try:
             analysis_id = data.get("analysis_id")
-            chat_db_id = data.get("chat_db_id") # Specific UUID for this conversation thread
+            chat_db_id = data.get(
+                "chat_db_id"
+            )  # Specific UUID for this conversation thread
             target_chat_id = None
-            
+
             if user and supabase_client:
                 profile = profile_for_chat or resolve_profile_for_user(user)
                 profile_id = profile_id_for_chat or profile["id"]
@@ -2996,11 +3612,25 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
                 if chat_db_id:
                     try:
                         # Append new messages locally for update
-                        updated_history = chat_history + [{"role": "user", "text": user_message}, {"role": "ai", "text": reply_text}]
-                        chat_check = supabase_client.table("chats").select("id, user_id").eq("id", chat_db_id).limit(1).execute()
+                        updated_history = chat_history + [
+                            {"role": "user", "text": user_message},
+                            {"role": "ai", "text": reply_text},
+                        ]
+                        chat_check = (
+                            supabase_client.table("chats")
+                            .select("id, user_id")
+                            .eq("id", chat_db_id)
+                            .limit(1)
+                            .execute()
+                        )
                         existing_chat = _first_profile_row(chat_check)
-                        if existing_chat and (profile.get("role") == "admin" or existing_chat.get("user_id") == profile_id):
-                            supabase_client.table("chats").update({"chat_history": updated_history}).eq("id", chat_db_id).execute()
+                        if existing_chat and (
+                            profile.get("role") == "admin"
+                            or existing_chat.get("user_id") == profile_id
+                        ):
+                            supabase_client.table("chats").update(
+                                {"chat_history": updated_history}
+                            ).eq("id", chat_db_id).execute()
                             chat_inserted_or_updated = True
                             target_chat_id = chat_db_id
                     except Exception as e:
@@ -3012,8 +3642,13 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
                     if is_first_message:
                         title_prompt = f"Summarize this insurance query into a 3-5 word short title. Query: {user_message}"
                         try:
-                            title_res = await generate_content_with_fallback(client, contents=[title_prompt], temperature=0.2, response_mime_type="text/plain")
-                            reply_title = title_res.text.strip().replace('"', '')
+                            title_res = await generate_content_with_fallback(
+                                client,
+                                contents=[title_prompt],
+                                temperature=0.2,
+                                response_mime_type="text/plain",
+                            )
+                            reply_title = title_res.text.strip().replace('"', "")
                         except:
                             reply_title = user_message[:30] + "..."
 
@@ -3030,14 +3665,21 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
                         if chat_res.data and len(chat_res.data) > 0:
                             chat_id = chat_res.data[0].get("id")
                             existing_history = chat_res.data[0].get("chat_history", [])
-                            if not isinstance(existing_history, list): existing_history = []
-                            existing_history.append({"role": "user", "text": user_message})
+                            if not isinstance(existing_history, list):
+                                existing_history = []
+                            existing_history.append(
+                                {"role": "user", "text": user_message}
+                            )
                             existing_history.append({"role": "ai", "text": reply_text})
-                            
-                            supabase_client.table("chats").update({"chat_history": existing_history}).eq("id", chat_id).execute()
-                            if reply_title: 
-                                supabase_client.table("chats").update({"title": reply_title}).eq("id", chat_id).execute()
-                            
+
+                            supabase_client.table("chats").update(
+                                {"chat_history": existing_history}
+                            ).eq("id", chat_id).execute()
+                            if reply_title:
+                                supabase_client.table("chats").update(
+                                    {"title": reply_title}
+                                ).eq("id", chat_id).execute()
+
                             chat_inserted_or_updated = True
                             target_chat_id = chat_id
 
@@ -3045,23 +3687,37 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
                 if not chat_inserted_or_updated:
                     # Generate title for new record if not already done
                     if not reply_title and is_first_message:
-                         title_prompt = f"Summarize this insurance query into a 3-5 word short title. Query: {user_message}"
-                         try:
-                             title_res = await generate_content_with_fallback(client, contents=[title_prompt], temperature=0.2, response_mime_type="text/plain")
-                             reply_title = title_res.text.strip().replace('"', '')
-                         except:
-                             reply_title = user_message[:30] + "..."
+                        title_prompt = f"Summarize this insurance query into a 3-5 word short title. Query: {user_message}"
+                        try:
+                            title_res = await generate_content_with_fallback(
+                                client,
+                                contents=[title_prompt],
+                                temperature=0.2,
+                                response_mime_type="text/plain",
+                            )
+                            reply_title = title_res.text.strip().replace('"', "")
+                        except:
+                            reply_title = user_message[:30] + "..."
 
-                    new_history = [{"role": "user", "text": user_message}, {"role": "ai", "text": reply_text}]
+                    new_history = [
+                        {"role": "user", "text": user_message},
+                        {"role": "ai", "text": reply_text},
+                    ]
                     insert_data = {"user_id": profile_id, "chat_history": new_history}
-                    if analysis_id: insert_data["analysis_id"] = analysis_id
-                    if reply_title: insert_data["title"] = reply_title
-                        
+                    if analysis_id:
+                        insert_data["analysis_id"] = analysis_id
+                    if reply_title:
+                        insert_data["title"] = reply_title
+
                     res = supabase_client.table("chats").insert(insert_data).execute()
                     if res.data and len(res.data) > 0:
                         target_chat_id = res.data[0].get("id")
-                        
-            return {"reply": reply_text, "title": reply_title, "chat_id": target_chat_id}
+
+            return {
+                "reply": reply_text,
+                "title": reply_title,
+                "chat_id": target_chat_id,
+            }
         except Exception as e:
             print(f"Supabase Chat Log Error: {e}")
             return {"reply": reply_text, "title": reply_title}
@@ -3071,68 +3727,87 @@ async def chat_with_report(data: dict, user: dict = Depends(get_current_user)):
         print(f"CHAT ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to process chat request.")
 
+
 @app.get("/api/chats/{analysis_id}")
-async def get_chats_for_analysis(analysis_id: str, user: dict = Depends(get_current_user)):
+async def get_chats_for_analysis(
+    analysis_id: str, user: dict = Depends(get_current_user)
+):
     """Fetches chat history for an analysis using the backend Service Role key, bypassing RLS."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
-        
+
     if not supabase_client:
         raise HTTPException(status_code=500, detail="Supabase client not initialized")
-        
+
     try:
         profile = resolve_profile_for_user(user)
-             
-        analysis_res = supabase_client.table("policy_analyses").select("user_id").eq("id", analysis_id).execute()
+
+        analysis_res = (
+            supabase_client.table("policy_analyses")
+            .select("user_id")
+            .eq("id", analysis_id)
+            .execute()
+        )
         analysis = _first_profile_row(analysis_res)
         if not analysis:
             raise HTTPException(status_code=404, detail="Analysis not found")
-             
-        if not is_analysis_access_allowed(profile, analysis):
-             raise HTTPException(status_code=403, detail="Not authorized to view these chats")
 
-        chat_res = supabase_client.table("chats").select("id, title, chat_history, updated_at").eq("analysis_id", analysis_id).order("updated_at", desc=True).execute()
-        
+        if not is_analysis_access_allowed(profile, analysis):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to view these chats"
+            )
+
+        chat_res = (
+            supabase_client.table("chats")
+            .select("id, title, chat_history, updated_at")
+            .eq("analysis_id", analysis_id)
+            .order("updated_at", desc=True)
+            .execute()
+        )
+
         return chat_res.data if chat_res.data else []
-        
+
     except HTTPException as he:
         raise he
     except Exception as e:
         print(f"❌ Error fetching chats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch chats: {str(e)}")
 
+
 @app.delete("/api/analysis/{analysis_id}")
 async def delete_analysis(analysis_id: str, user: dict = Depends(get_current_user)):
     """Deletes an analysis and its associated PDF from storage."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
-        
+
     if not supabase_client:
         raise HTTPException(status_code=500, detail="Supabase client not initialized")
-        
+
     try:
         profile = resolve_profile_for_user(user)
         user_id = profile["id"]
-        
+
         # 1. Check if user is Admin or Owner
         is_admin = profile.get("role") == "admin"
-            
+
         analysis_res = (
             supabase_client.table("policy_analyses")
             .select("user_id, extracted_data, pdf_file_url")
             .eq("id", analysis_id)
             .execute()
         )
-        
+
         if not analysis_res.data:
             raise HTTPException(status_code=404, detail="Analysis not found")
-            
+
         analysis = analysis_res.data[0]
         is_owner = analysis.get("user_id") == user_id
-        
+
         if not is_admin and not is_owner:
-            raise HTTPException(status_code=403, detail="Not authorized to delete this analysis")
-            
+            raise HTTPException(
+                status_code=403, detail="Not authorized to delete this analysis"
+            )
+
         # 2. Delete file from Storage if exists
         extracted_data = analysis.get("extracted_data") or {}
         pdf_url = analysis.get("pdf_file_url") or extracted_data.get("pdf_file_url")
@@ -3140,46 +3815,58 @@ async def delete_analysis(analysis_id: str, user: dict = Depends(get_current_use
             try:
                 # Extract path from URL: https://[project-id].supabase.co/storage/v1/object/public/policy_pdfs/[path]
                 if "/public/policy_pdfs/" in pdf_url:
-                    path = urllib.parse.unquote(pdf_url.split("/public/policy_pdfs/")[1])
+                    path = urllib.parse.unquote(
+                        pdf_url.split("/public/policy_pdfs/")[1]
+                    )
                     print(f"🗑️ Deleting PDF from storage: {path}")
                     res = supabase_client.storage.from_("policy_pdfs").remove([path])
                     print(f"✅ PDF deleted from storage.")
             except Exception as e:
-                 print(f"⚠️ Failed to delete PDF from storage: {e}")
-                 
+                print(f"⚠️ Failed to delete PDF from storage: {e}")
+
         # 3. Delete associated chats from Database
         try:
-            supabase_client.table("chats").delete().eq("analysis_id", analysis_id).execute()
+            supabase_client.table("chats").delete().eq(
+                "analysis_id", analysis_id
+            ).execute()
             print(f"✅ Associated chats for analysis {analysis_id} deleted.")
         except Exception as e:
             print(f"⚠️ Failed to delete associated chats: {e}")
 
         # 4. Delete row from Database
-        delete_res = supabase_client.table("policy_analyses").delete().eq("id", analysis_id).execute()
+        delete_res = (
+            supabase_client.table("policy_analyses")
+            .delete()
+            .eq("id", analysis_id)
+            .execute()
+        )
         print(f"✅ Analysis row {analysis_id} deleted from database.")
-        
+
         return {"message": "Analysis deleted successfully"}
-    
+
     except HTTPException as he:
         raise he
     except Exception as e:
         print(f"❌ Error deleting analysis {analysis_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete analysis: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete analysis: {str(e)}"
+        )
+
 
 @app.delete("/api/user/self")
 async def delete_self(user: dict = Depends(get_current_user)):
     """Deletes the currently authenticated user's application data."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
-        
+
     if not supabase_client:
         raise HTTPException(status_code=500, detail="Supabase client not initialized")
-        
+
     try:
         profile = resolve_profile_for_user(user)
         user_id = profile["id"]
         print(f"🗑️ Request to delete application data for profile: {user_id}")
-        
+
         analyses_res = (
             supabase_client.table("policy_analyses")
             .select("id, extracted_data, pdf_file_url")
@@ -3193,16 +3880,22 @@ async def delete_self(user: dict = Depends(get_current_user)):
             pdf_url = analysis.get("pdf_file_url") or extracted_data.get("pdf_file_url")
             if pdf_url and "/public/policy_pdfs/" in pdf_url:
                 try:
-                    path = urllib.parse.unquote(pdf_url.split("/public/policy_pdfs/")[1])
+                    path = urllib.parse.unquote(
+                        pdf_url.split("/public/policy_pdfs/")[1]
+                    )
                     supabase_client.storage.from_("policy_pdfs").remove([path])
                 except Exception as e:
-                    print(f"⚠️ Failed to delete PDF for analysis {analysis.get('id')}: {e}")
+                    print(
+                        f"⚠️ Failed to delete PDF for analysis {analysis.get('id')}: {e}"
+                    )
 
         # Chats must be deleted first because chats.analysis_id may not cascade.
         supabase_client.table("chats").delete().eq("user_id", user_id).execute()
-        supabase_client.table("policy_analyses").delete().eq("user_id", user_id).execute()
+        supabase_client.table("policy_analyses").delete().eq(
+            "user_id", user_id
+        ).execute()
         supabase_client.table("profiles").delete().eq("id", user_id).execute()
-        
+
         print(f"✅ Application data for profile {user_id} deleted successfully.")
         return {
             "message": (
@@ -3210,18 +3903,26 @@ async def delete_self(user: dict = Depends(get_current_user)):
                 "delete the Cognito account through the auth service if required."
             )
         }
-        
+
     except Exception as e:
         print(f"❌ Error deleting user: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete account: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
     import uvicorn
-    reload_enabled = os.getenv("UVICORN_RELOAD", "").lower() in {"1", "true", "yes", "on"}
+
+    reload_enabled = os.getenv("UVICORN_RELOAD", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     uvicorn.run(
         "main:app",
         host=os.getenv("HOST", "127.0.0.1"),
-        port=int(os.getenv("PORT", "8000")),
+        port=int(os.getenv("PORT", "8001")),
         reload=reload_enabled,
     )
